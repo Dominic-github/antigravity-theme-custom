@@ -2,8 +2,47 @@
   if (typeof window !== 'undefined' && window.self !== window.top) return;
 
   const THEMES = /*__THEMES_PLACEHOLDER__*/{};
+  if (THEMES['Railway Horizon']) {
+    THEMES['Railway Horizon (Dynamic)'] = THEMES['Railway Horizon'];
+  }
   const THEME_KEYS = Object.keys(THEMES);
-  const DEFAULT_THEME_KEY = THEME_KEYS[0] || 'Default';
+  const PUBLIC_THEME_KEYS = THEME_KEYS.filter(name => !THEMES[name]?.isInternal && name !== 'Railway Horizon (Dynamic)');
+  const DEFAULT_THEME_KEY = THEMES['Railway Horizon'] ? 'Railway Horizon' : (THEME_KEYS[0] || 'Default');
+
+  function isHourDaytime(h, startHour, endHour) {
+    const s = (startHour !== undefined && !isNaN(startHour)) ? startHour : 6;
+    const e = (endHour !== undefined && !isNaN(endHour)) ? endHour : 16;
+    if (s < e) {
+      return h >= s && h < e;
+    } else {
+      return h >= s || h < e;
+    }
+  }
+
+  function resolveTheme(name, optSt) {
+    let th = THEMES[name] || THEMES[DEFAULT_THEME_KEY];
+    if (th && th.isDynamic) {
+      const st = optSt || getState();
+      const h = new Date().getHours();
+      const s = st && st.dynamicStart !== undefined ? st.dynamicStart : (th.dayStart ?? 6);
+      const e = st && st.dynamicEnd !== undefined ? st.dynamicEnd : (th.dayEnd ?? 16);
+      const isDay = isHourDaytime(h, s, e);
+      const targetName = isDay ? th.dayTheme : th.nightTheme;
+      th = THEMES[targetName] || th;
+    }
+    return th;
+  }
+
+  function getDynamicSubThemeName(name, optSt) {
+    const th = THEMES[name];
+    if (!th || !th.isDynamic) return name;
+    const st = optSt || getState();
+    const h = new Date().getHours();
+    const s = st && st.dynamicStart !== undefined ? st.dynamicStart : (th.dayStart ?? 6);
+    const e = st && st.dynamicEnd !== undefined ? st.dynamicEnd : (th.dayEnd ?? 16);
+    const isDay = isHourDaytime(h, s, e);
+    return isDay ? th.dayTheme : th.nightTheme;
+  }
 
   const STORAGE_THEME = 'agy_theme_v3';
   const STORAGE_BUBBLE = 'agy_bubble_v3';
@@ -17,6 +56,9 @@
   const STORAGE_AVATAR_SIZE = 'agy_avatar_size_v3';
   const STORAGE_AVATAR_RADIUS = 'agy_avatar_radius_v3';
   const STORAGE_LEAVES = 'agy_leaves_enabled_v3';
+  const STORAGE_DYNAMIC_START = 'agy_dynamic_start_v3';
+  const STORAGE_DYNAMIC_END = 'agy_dynamic_end_v3';
+  const STORAGE_PARTICLE_TYPE = 'agy_particle_type_v3';
 
   let _lastSw = -1;
   let _lastHdrBottom = -1;
@@ -49,7 +91,7 @@
     const localTheme = localStorage.getItem(STORAGE_THEME);
     const rawTheme = (localTheme && THEMES[localTheme])
       ? localTheme
-      : (init.themeName && THEMES[init.themeName] ? init.themeName : (THEMES['Crimson Horizon'] ? 'Crimson Horizon' : DEFAULT_THEME_KEY));
+      : (init.themeName && THEMES[init.themeName] ? init.themeName : (THEMES['Railway Horizon'] ? 'Railway Horizon' : (THEMES['Crimson Horizon'] ? 'Crimson Horizon' : DEFAULT_THEME_KEY)));
     const themeName = THEMES[rawTheme] ? rawTheme : DEFAULT_THEME_KEY;
 
     const localBubble = localStorage.getItem(STORAGE_BUBBLE);
@@ -75,6 +117,11 @@
     const leavesEnabled = localStorage.getItem(STORAGE_LEAVES) !== null
       ? localStorage.getItem(STORAGE_LEAVES) === 'true'
       : (init.leavesEnabled !== undefined ? !!init.leavesEnabled : true);
+    const rawStart = localStorage.getItem(STORAGE_DYNAMIC_START);
+    const dynamicStart = rawStart !== null ? parseInt(rawStart, 10) : (init.dynamicStart !== undefined ? init.dynamicStart : 6);
+    const rawEnd = localStorage.getItem(STORAGE_DYNAMIC_END);
+    const dynamicEnd = rawEnd !== null ? parseInt(rawEnd, 10) : (init.dynamicEnd !== undefined ? init.dynamicEnd : 16);
+    const particleType = localStorage.getItem(STORAGE_PARTICLE_TYPE) || init.particleType || 'auto';
 
     try {
       if (localStorage.getItem(STORAGE_THEME) !== themeName) {
@@ -85,7 +132,7 @@
       }
     } catch (_) {}
 
-    return { themeName, bubbleName, inputStyle, dimming, wpEnabled, customWp, userAvatar, agentAvatar, glassBlur, avatarSize, avatarRadius, leavesEnabled };
+    return { themeName, bubbleName, inputStyle, dimming, wpEnabled, customWp, userAvatar, agentAvatar, glassBlur, avatarSize, avatarRadius, leavesEnabled, dynamicStart, dynamicEnd, particleType };
   }
 
   // Downscale user/agent avatar uploads to 192x192 WebP once so theme_config.json stays tiny
@@ -192,6 +239,15 @@
       if (overrides.leavesEnabled !== undefined) {
         localStorage.setItem(STORAGE_LEAVES, String(overrides.leavesEnabled));
       }
+      if (overrides.dynamicStart !== undefined) {
+        localStorage.setItem(STORAGE_DYNAMIC_START, String(overrides.dynamicStart));
+      }
+      if (overrides.dynamicEnd !== undefined) {
+        localStorage.setItem(STORAGE_DYNAMIC_END, String(overrides.dynamicEnd));
+      }
+      if (overrides.particleType !== undefined) {
+        localStorage.setItem(STORAGE_PARTICLE_TYPE, overrides.particleType);
+      }
     } catch (e) {}
 
     if (window.agySaveThemeConfig) {
@@ -202,9 +258,10 @@
 
     syncAutumnLeaves(st);
 
-    const mainTheme = THEMES[st.themeName] || THEMES[DEFAULT_THEME_KEY];
-    const bubbleTheme = THEMES[st.bubbleName] || mainTheme;
+    const mainTheme = resolveTheme(st.themeName, st);
+    const bubbleTheme = resolveTheme(st.bubbleName, st);
     const wpUrl = st.customWp || mainTheme.wallpaper || '';
+    window.__AGY_CURRENT_DYNAMIC_SUBTHEME__ = getDynamicSubThemeName(st.themeName, st);
 
     const oldLegacy = document.getElementById('antigravity-ho-ly-chibi-theme');
     if (oldLegacy) oldLegacy.remove();
@@ -1054,7 +1111,7 @@
 
   function syncTitleBarOverlay(stOverride) {
     const st = stOverride || getState();
-    const activeTh = THEMES[st.themeName] || THEMES[DEFAULT_THEME_KEY] || {};
+    const activeTh = resolveTheme(st.themeName) || {};
     if (window.electronNative && typeof window.electronNative.setTitleBarOverlay === 'function') {
       try {
         window.electronNative.setTitleBarOverlay({
@@ -1115,6 +1172,9 @@
   window.__ANTIGRAVITY_APPLY_CUSTOM_THEME__ = applyTheme;
   window.__ANTIGRAVITY_REMOVE_CUSTOM_THEME__ = removeCustomTheme;
   window.__ANTIGRAVITY_OPEN_THEME_MODAL__ = openCustomThemeModal;
+  window.__AGY_APPLY_THEME__ = applyTheme;
+  window.__AGY_GET_STATE__ = getState;
+  window.__AGY_THEMES__ = THEMES;
 
   applyTheme();
 
@@ -1140,7 +1200,7 @@
           <div id="agy-custom-theme-modal-header" style="display: flex; justify-content: space-between; align-items: center; padding: 18px 26px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); background: rgba(22, 16, 14, 0.85);">
             <div style="display: flex; align-items: center; gap: 10px;">
               <span style="font-size: 17px; font-weight: 600; color: #f4f4f5; letter-spacing: -0.2px;">Custom Theme Studio</span>
-              <span id="agy-custom-theme-badge" style="font-size: 11.5px; padding: 2.5px 9px; border-radius: 9999px; background: rgba(224, 142, 85, 0.2); color: #e08e55; font-weight: 500; border: 1px solid rgba(224, 142, 85, 0.3);">${THEME_KEYS.length} Preset${THEME_KEYS.length > 1 ? 's' : ''}</span>
+              <span id="agy-custom-theme-badge" style="font-size: 11.5px; padding: 2.5px 9px; border-radius: 9999px; background: rgba(224, 142, 85, 0.2); color: #e08e55; font-weight: 500; border: 1px solid rgba(224, 142, 85, 0.3);">${PUBLIC_THEME_KEYS.length} Preset${PUBLIC_THEME_KEYS.length > 1 ? 's' : ''}</span>
             </div>
             <button id="agy-theme-modal-close-btn" type="button" style="background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.1); color: #d4d4d8; cursor: pointer; width: 30px; height: 30px; border-radius: 8px; font-size: 15px; display: flex; align-items: center; justify-content: center; transition: all 0.15s ease;">✕</button>
           </div>
@@ -1170,9 +1230,14 @@
 
   function renderThemePanels(container) {
     const st = getState();
-    const mainTheme = THEMES[st.themeName] || THEMES[DEFAULT_THEME_KEY];
+    const mainTheme = resolveTheme(st.themeName, st);
+    const activeThDef = THEMES[st.themeName] || {};
+    const isDynamicActive = !!activeThDef.isDynamic;
     const effUserAv = st.userAvatar === 'none' ? '' : (st.userAvatar || mainTheme.userAvatar || '');
     const effAgentAv = st.agentAvatar === 'none' ? '' : (st.agentAvatar || mainTheme.agentAvatar || '');
+    const activeParticleMode = (st.particleType && st.particleType !== 'auto')
+      ? st.particleType
+      : (mainTheme.particleType || 'sakura');
 
     container.innerHTML = `
       <div id="agy-theme-scroll-container" style="padding: 24px 32px 48px 32px; max-width: 860px; margin: 0 auto; overflow-y: auto; height: 100%; color: #f4f4f5;">
@@ -1187,10 +1252,15 @@
                 <input id="agy-wp-toggle" type="checkbox" ${st.wpEnabled ? 'checked' : ''} style="accent-color: ${mainTheme.primary}; cursor: pointer;" />
                 Backdrop
               </label>
-              <label style="display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: #fde68a; cursor: pointer;">
-                <input id="agy-leaves-toggle" type="checkbox" ${st.leavesEnabled ? 'checked' : ''} style="accent-color: #f59e0b; cursor: pointer;" />
-                🍂 Lá vàng rơi
+              <label style="display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: #fbcfe8; cursor: pointer;">
+                <input id="agy-leaves-toggle" type="checkbox" ${st.leavesEnabled ? 'checked' : ''} style="accent-color: #f472b6; cursor: pointer;" />
+                <span id="agy-particle-label">${activeParticleMode === 'sakura' ? '🌸 Hoa anh đào rơi' : '🍂 Lá vàng rơi'}</span>
               </label>
+              <select id="agy-particle-select" style="background: rgba(15, 23, 42, 0.85); color: #f4f4f5; border: 1px solid ${mainTheme.borderColor}; border-radius: 6px; font-size: 11px; padding: 2px 6px; cursor: pointer;">
+                <option value="auto" ${st.particleType === 'auto' ? 'selected' : ''}>Tự động theo Theme</option>
+                <option value="sakura" ${st.particleType === 'sakura' ? 'selected' : ''}>🌸 Hoa anh đào</option>
+                <option value="autumn" ${st.particleType === 'autumn' ? 'selected' : ''}>🍂 Lá vàng rơi</option>
+              </select>
               <label style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: #a1a1aa;">
                 Dim
                 <input id="agy-dim-slider" type="range" min="15" max="92" value="${st.dimming}" style="width: 96px; cursor: pointer; accent-color: #ffffff; height: 5px;" />
@@ -1221,6 +1291,32 @@
             <div style="display: flex; justify-content: flex-end; align-items: center; gap: 8px;">
               <span id="agy-import-msg" style="font-size: 12px; color: #fca5a5;"></span>
               <button id="agy-import-apply" type="button" style="padding: 5px 12px; border-radius: 7px; background: ${mainTheme.primary}; color: #090d16; font-weight: 600; font-size: 12px; border: none; cursor: pointer;">Apply JSON</button>
+            </div>
+          </div>
+          <div id="agy-dynamic-schedule-box" style="display: ${isDynamicActive ? 'flex' : 'none'}; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.28); border-radius: 10px; padding: 10px 14px; margin-top: 2px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 16px;">⏰</span>
+              <div>
+                <div style="font-size: 13.5px; font-weight: 600; color: #7dd3fc;">Thời gian chuyển đổi Theme (Dynamic Schedule)</div>
+                <div style="font-size: 11.5px; color: #94a3b8;">Tự động đổi hình nền & tone màu: Biển Xanh (Ban ngày) và Hoàng Hôn (Chiều/Tối).</div>
+              </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 12px; font-size: 12.5px; flex-wrap: wrap;">
+              <label style="display: flex; align-items: center; gap: 6px; color: #e0f2fe; font-weight: 500;">
+                ☀️ Sáng từ:
+                <select id="agy-dynamic-start-select" style="background: rgba(15, 23, 42, 0.90); color: #7dd3fc; border: 1px solid rgba(56, 189, 248, 0.45); border-radius: 6px; padding: 3px 8px; font-weight: 600; cursor: pointer;">
+                  ${Array.from({length: 24}, (_, i) => `<option value="${i}" ${i === st.dynamicStart ? 'selected' : ''}>${String(i).padStart(2, '0')}:00</option>`).join('')}
+                </select>
+              </label>
+              <label style="display: flex; align-items: center; gap: 6px; color: #fde68a; font-weight: 500;">
+                🌅 Chiều/Tối từ:
+                <select id="agy-dynamic-end-select" style="background: rgba(15, 23, 42, 0.90); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.45); border-radius: 6px; padding: 3px 8px; font-weight: 600; cursor: pointer;">
+                  ${Array.from({length: 24}, (_, i) => `<option value="${i}" ${i === st.dynamicEnd ? 'selected' : ''}>${String(i).padStart(2, '0')}:00</option>`).join('')}
+                </select>
+              </label>
+              <span id="agy-dynamic-status-badge" style="font-size: 11px; padding: 3px 8px; border-radius: 6px; background: rgba(56, 189, 248, 0.2); color: #bae6fd; font-weight: 600;">
+                ${isHourDaytime(new Date().getHours(), st.dynamicStart, st.dynamicEnd) ? '☀️ Đang áp dụng: Ban ngày' : '🌅 Đang áp dụng: Hoàng hôn'}
+              </span>
             </div>
           </div>
         </div>
@@ -1268,9 +1364,9 @@
           <div style="font-size: 15px; font-weight: 600; color: #ffffff; margin-bottom: 4px;">User Chat Bubble</div>
           <div style="font-size: 12.5px; color: #a1a1aa; margin-bottom: 14px;">Mix and match bubble frame & ornament independently from the active wallpaper.</div>
           <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">
-            ${THEME_KEYS.map(name => {
-              const th = THEMES[name];
-              const isSelected = name === st.bubbleName;
+            ${PUBLIC_THEME_KEYS.map(name => {
+              const th = resolveTheme(name, st);
+              const isSelected = name === st.bubbleName || (name === 'Railway Horizon' && st.bubbleName === 'Railway Horizon (Dynamic)');
               const stickerTop = th.isOrnament ? Math.round((th.stickerTop || 0) * 0.85) : Math.round((th.stickerTop || 0) * 0.74);
               const stickerW = Math.round((th.stickerW || 0) * 0.78);
               const stickerH = th.isOrnament ? Math.round((th.stickerH || 0) * 0.8) : Math.round((th.stickerH || 0) * 0.78);
@@ -1300,7 +1396,7 @@
           <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">
             ${Object.entries(INPUT_STYLES).map(([key, item]) => {
               const isSelected = key === st.inputStyle;
-              const activeBubbleTh = THEMES[st.bubbleName] || mainTheme;
+              const activeBubbleTh = resolveTheme(st.bubbleName) || mainTheme;
               const previewStickerStyle = activeBubbleTh.isOrnament
                 ? 'top: -12px; right: 10px; width: 72px; height: 22px; background-position: center;'
                 : 'top: -22px; right: 10px; width: 32px; height: 28px; background-position: bottom center;';
@@ -1330,23 +1426,28 @@
         </div>
 
         <div>
-          <div style="font-size: 15px; font-weight: 600; color: #ffffff; margin-bottom: 4px;">Theme Presets (${THEME_KEYS.length})</div>
+          <div style="font-size: 15px; font-weight: 600; color: #ffffff; margin-bottom: 4px;">Theme Presets (${PUBLIC_THEME_KEYS.length})</div>
           <div style="font-size: 12.5px; color: #a1a1aa; margin-bottom: 14px;">Complete backdrop, palette, unified L-glass, and matching ornaments.</div>
           <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">
-            ${THEME_KEYS.map(name => {
+            ${PUBLIC_THEME_KEYS.map(name => {
               const th = THEMES[name];
-              const isSelected = name === st.themeName;
-              const thumbBg = th.wallpaper
-                ? `linear-gradient(180deg, rgba(0,0,0,0.15), rgba(14,12,12,0.85)), url('${th.wallpaper}')`
+              const resolvedTh = resolveTheme(name, st);
+              const isSelected = name === st.themeName || (name === 'Railway Horizon' && st.themeName === 'Railway Horizon (Dynamic)');
+              const thumbWp = (th.isDynamic ? resolvedTh.wallpaper : th.wallpaper);
+              const thumbBg = thumbWp
+                ? `linear-gradient(180deg, rgba(0,0,0,0.15), rgba(14,12,12,0.85)), url('${thumbWp}')`
                 : (th.pureBg || th.bg);
               const thumbOrnamentStyle = th.isOrnament
                 ? 'right: 10px; bottom: 8px; width: 76px; height: 24px; background-position: center;'
                 : 'right: 12px; bottom: 4px; width: 42px; height: 38px; background-position: bottom center;';
+              const dynamicBadge = th.isDynamic
+                ? `<span style="font-size: 10px; font-weight: 600; background: rgba(56, 189, 248, 0.22); color: #7dd3fc; border: 1px solid rgba(56, 189, 248, 0.45); border-radius: 4px; padding: 2px 6px; margin-left: 6px;">⏰ Auto ${st.dynamicStart}h-${st.dynamicEnd}h</span>`
+                : '';
               return `
                 <div class="agy-preset-card" data-name="${name}" style="border-radius: 12px; border: ${isSelected ? '1.5px solid #f4f4f5' : '1px solid rgba(255, 255, 255, 0.12)'}; background: rgba(14, 12, 12, 0.82); overflow: hidden; cursor: pointer; display: flex; flex-direction: column; transition: border-color 0.15s ease;">
                   <div style="height: 68px; width: 100%; background-image: ${thumbBg}; background-size: cover; background-position: ${th.bgPosition || 'center'}; position: relative; display: flex; align-items: flex-end; padding: 8px 14px;">
                     ${th.sticker ? `<div style="position: absolute; ${thumbOrnamentStyle} background-image: url('${th.sticker}'); background-size: contain; background-repeat: no-repeat; pointer-events: none;"></div>` : ''}
-                    <span style="font-size: 13.5px; font-weight: 600; color: #fff;">${name}</span>
+                    <div style="display: flex; align-items: center;"><span style="font-size: 13.5px; font-weight: 600; color: #fff;">${name}</span>${dynamicBadge}</div>
                   </div>
                   <div style="padding: 10px 14px; display: flex; justify-content: space-between; align-items: center;">
                     <span style="font-size: 12px; color: #a1a1aa;">${th.concept || ''}</span>
@@ -1361,7 +1462,7 @@
     `;
 
     function updateInputPreviews(bName) {
-      const activeTh = THEMES[bName] || THEMES[DEFAULT_THEME_KEY];
+      const activeTh = resolveTheme(bName);
       container.querySelectorAll('.agy-input-card').forEach(card => {
         const key = card.dataset.style;
         const outer = card.querySelector('.agy-input-preview-outer');
@@ -1421,6 +1522,44 @@
       leavesToggle.addEventListener('change', (e) => {
         applyTheme({ leavesEnabled: e.target.checked });
       });
+    }
+
+    const particleSelect = container.querySelector('#agy-particle-select');
+    const particleLabel = container.querySelector('#agy-particle-label');
+    if (particleSelect) {
+      particleSelect.addEventListener('change', (e) => {
+        const mode = e.target.value;
+        const curTheme = resolveTheme(getState().themeName);
+        const effectiveMode = mode === 'auto' ? (curTheme.particleType || 'sakura') : mode;
+        if (particleLabel) {
+          particleLabel.textContent = effectiveMode === 'sakura' ? '🌸 Hoa anh đào rơi' : '🍂 Lá vàng rơi';
+        }
+        applyTheme({ particleType: mode });
+      });
+    }
+
+    const dynStartSelect = container.querySelector('#agy-dynamic-start-select');
+    const dynEndSelect = container.querySelector('#agy-dynamic-end-select');
+    const dynStatusBadge = container.querySelector('#agy-dynamic-status-badge');
+    const dynScheduleBox = container.querySelector('#agy-dynamic-schedule-box');
+
+    function updateDynamicBadge(s, e) {
+      const isDay = isHourDaytime(new Date().getHours(), s, e);
+      if (dynStatusBadge) {
+        dynStatusBadge.textContent = isDay ? '☀️ Đang áp dụng: Ban ngày' : '🌅 Đang áp dụng: Hoàng hôn';
+        dynStatusBadge.style.color = isDay ? '#bae6fd' : '#fde68a';
+      }
+    }
+
+    if (dynStartSelect && dynEndSelect) {
+      const onScheduleChange = () => {
+        const s = parseInt(dynStartSelect.value, 10);
+        const e = parseInt(dynEndSelect.value, 10);
+        updateDynamicBadge(s, e);
+        applyTheme({ dynamicStart: s, dynamicEnd: e });
+      };
+      dynStartSelect.addEventListener('change', onScheduleChange);
+      dynEndSelect.addEventListener('change', onScheduleChange);
     }
 
     const wpUpload = container.querySelector('#agy-wp-upload');
@@ -1643,6 +1782,17 @@
       card.addEventListener('click', () => {
         const name = card.dataset.name;
         applyTheme({ themeName: name, bubbleName: name, customWp: '' });
+
+        const chosenTh = THEMES[name];
+        if (dynScheduleBox) {
+          dynScheduleBox.style.display = (chosenTh && chosenTh.isDynamic) ? 'flex' : 'none';
+        }
+        if (particleLabel) {
+          const effectiveMode = (getState().particleType && getState().particleType !== 'auto')
+            ? getState().particleType
+            : (chosenTh?.particleType || 'sakura');
+          particleLabel.textContent = effectiveMode === 'sakura' ? '🌸 Hoa anh đào rơi' : '🍂 Lá vàng rơi';
+        }
 
         container.querySelectorAll('.agy-preset-card').forEach(c => {
           const isSel = c.dataset.name === name;
@@ -1869,7 +2019,7 @@
 
   function injectRunningDogs() {
     const st = getState();
-    const theme = THEMES[st.themeName] || THEMES[DEFAULT_THEME_KEY];
+    const theme = resolveTheme(st.themeName);
     const runningDogsSrc = (theme && theme.runningDogs)
       ? theme.runningDogs
       : (Object.values(THEMES).find(t => t && t.runningDogs)?.runningDogs || '');
@@ -1924,7 +2074,19 @@
     header.parentNode.insertBefore(banner, header);
   }
 
+  function checkDynamicTheme() {
+    const st = getState();
+    const th = THEMES[st.themeName];
+    if (!th || !th.isDynamic) return;
+    const currentSub = getDynamicSubThemeName(st.themeName, st);
+    if (window.__AGY_CURRENT_DYNAMIC_SUBTHEME__ && window.__AGY_CURRENT_DYNAMIC_SUBTHEME__ !== currentSub) {
+      window.__AGY_CURRENT_DYNAMIC_SUBTHEME__ = currentSub;
+      applyTheme(st);
+    }
+  }
+
   function tick() {
+    checkDynamicTheme();
     injectMainSidebarButton();
     injectSettingsModalButton();
     injectRunningDogs();
@@ -1995,8 +2157,14 @@
       shell.insertBefore(canvas, shell.firstChild);
     }
 
-    if (canvas.dataset.running === '1') return;
+    const activeMainTh = resolveTheme(st.themeName, st);
+    const particleMode = (st.particleType && st.particleType !== 'auto')
+      ? st.particleType
+      : (activeMainTh.particleType || 'sakura');
+
+    if (canvas.dataset.running === '1' && canvas.dataset.mode === particleMode) return;
     canvas.dataset.running = '1';
+    canvas.dataset.mode = particleMode;
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
@@ -2011,7 +2179,15 @@
     };
     window.addEventListener('resize', onResize, { passive: true });
 
-    const LEAF_COLORS = [
+    const SAKURA_COLORS = [
+      { fill: '#fbcfe8', stroke: '#f472b6', opacity: 0.76 },
+      { fill: '#f472b6', stroke: '#db2777', opacity: 0.65 },
+      { fill: '#fff1f2', stroke: '#fbcfe8', opacity: 0.82 },
+      { fill: '#fda4af', stroke: '#f43f5e', opacity: 0.70 },
+      { fill: '#fce7f3', stroke: '#ec4899', opacity: 0.72 }
+    ];
+
+    const AUTUMN_COLORS = [
       { fill: '#f59e0b', vein: '#b45309', opacity: 0.60 },
       { fill: '#eab308', vein: '#a16207', opacity: 0.65 },
       { fill: '#f97316', vein: '#c2410c', opacity: 0.55 },
@@ -2020,31 +2196,50 @@
       { fill: '#fbbf24', vein: '#d97706', opacity: 0.62 }
     ];
 
-    const LEAF_COUNT = 14;
-    const leaves = [];
+    const PARTICLE_COUNT = particleMode === 'sakura' ? 18 : 14;
+    const particles = [];
 
-    function resetLeaf(leaf, fromTop = true) {
-      const p = LEAF_COLORS[Math.floor(Math.random() * LEAF_COLORS.length)];
-      leaf.x = Math.random() * width;
-      leaf.y = fromTop ? -(10 + Math.random() * 25) : Math.random() * height;
-      leaf.size = 8 + Math.random() * 6;
-      leaf.vy = 0.20 + Math.random() * 0.28; // soothing slow fall
-      leaf.wind = 0.10 + Math.random() * 0.18; // gentle rightward drift
-      leaf.swing = Math.random() * Math.PI * 2;
-      leaf.swingSpeed = 0.008 + Math.random() * 0.012; // slow sway
-      leaf.swingAmp = 0.6 + Math.random() * 0.8;
-      leaf.angle = Math.random() * Math.PI * 2;
-      leaf.vAngle = (Math.random() - 0.5) * 0.012; // slow rotation
-      leaf.flip = Math.random() * Math.PI * 2;
-      leaf.vFlip = 0.012 + Math.random() * 0.016; // gentle curl
-      leaf.color = p.fill;
-      leaf.vein = p.vein;
-      leaf.opacity = p.opacity * (0.7 + Math.random() * 0.3);
-      return leaf;
+    function resetParticle(p, fromTop = true) {
+      if (particleMode === 'sakura') {
+        const pal = SAKURA_COLORS[Math.floor(Math.random() * SAKURA_COLORS.length)];
+        p.x = Math.random() * width;
+        p.y = fromTop ? -(10 + Math.random() * 25) : Math.random() * height;
+        p.size = 7 + Math.random() * 5;
+        p.vy = 0.22 + Math.random() * 0.26;
+        p.wind = 0.15 + Math.random() * 0.22;
+        p.swing = Math.random() * Math.PI * 2;
+        p.swingSpeed = 0.010 + Math.random() * 0.015;
+        p.swingAmp = 0.7 + Math.random() * 0.9;
+        p.angle = Math.random() * Math.PI * 2;
+        p.vAngle = (Math.random() - 0.5) * 0.014;
+        p.flip = Math.random() * Math.PI * 2;
+        p.vFlip = 0.014 + Math.random() * 0.018;
+        p.color = pal.fill;
+        p.stroke = pal.stroke;
+        p.opacity = pal.opacity * (0.75 + Math.random() * 0.25);
+      } else {
+        const pal = AUTUMN_COLORS[Math.floor(Math.random() * AUTUMN_COLORS.length)];
+        p.x = Math.random() * width;
+        p.y = fromTop ? -(10 + Math.random() * 25) : Math.random() * height;
+        p.size = 8 + Math.random() * 6;
+        p.vy = 0.20 + Math.random() * 0.28;
+        p.wind = 0.10 + Math.random() * 0.18;
+        p.swing = Math.random() * Math.PI * 2;
+        p.swingSpeed = 0.008 + Math.random() * 0.012;
+        p.swingAmp = 0.6 + Math.random() * 0.8;
+        p.angle = Math.random() * Math.PI * 2;
+        p.vAngle = (Math.random() - 0.5) * 0.012;
+        p.flip = Math.random() * Math.PI * 2;
+        p.vFlip = 0.012 + Math.random() * 0.016;
+        p.color = pal.fill;
+        p.stroke = pal.vein;
+        p.opacity = pal.opacity * (0.7 + Math.random() * 0.3);
+      }
+      return p;
     }
 
-    for (let i = 0; i < LEAF_COUNT; i++) {
-      leaves.push(resetLeaf({}, false));
+    for (let i = 0; i < PARTICLE_COUNT; i++) {
+      particles.push(resetParticle({}, false));
     }
 
     let isVisible = true;
@@ -2068,15 +2263,14 @@
         return;
       }
 
-      // Delta time normalized to 60fps (16.67ms) to keep identical speed on 120Hz/144Hz screens
       const elapsed = now - lastTime;
       lastTime = now;
       const dt = Math.min(2.0, Math.max(0.4, elapsed / 16.67));
 
       ctx.clearRect(0, 0, width, height);
 
-      for (let i = 0; i < leaves.length; i++) {
-        const l = leaves[i];
+      for (let i = 0; i < particles.length; i++) {
+        const l = particles[i];
         l.swing += l.swingSpeed * dt;
         l.angle += l.vAngle * dt;
         l.flip += l.vFlip * dt;
@@ -2084,30 +2278,43 @@
         l.x += (l.wind + Math.sin(l.swing) * l.swingAmp) * dt;
 
         if (l.y > height + 25 || l.x > width + 25) {
-          resetLeaf(l, true);
+          resetParticle(l, true);
         }
 
         ctx.save();
         ctx.translate(l.x, l.y);
         ctx.rotate(l.angle);
-        // Curl width smoothly between 70% and 100% (never collapses to 0, eliminating any strobe/flicker)
-        const curl = 0.70 + 0.30 * Math.cos(l.flip);
+        const curl = 0.65 + 0.35 * Math.cos(l.flip);
         ctx.scale(curl, 1);
         ctx.globalAlpha = l.opacity;
 
-        ctx.fillStyle = l.color;
-        ctx.beginPath();
-        ctx.moveTo(0, -l.size);
-        ctx.bezierCurveTo(l.size * 0.68, -l.size * 0.30, l.size * 0.68, l.size * 0.60, 0, l.size);
-        ctx.bezierCurveTo(-l.size * 0.68, l.size * 0.60, -l.size * 0.68, -l.size * 0.30, 0, -l.size);
-        ctx.fill();
+        if (particleMode === 'sakura') {
+          ctx.fillStyle = l.color;
+          ctx.beginPath();
+          ctx.moveTo(0, l.size);
+          ctx.bezierCurveTo(l.size * 0.75, l.size * 0.4, l.size * 0.85, -l.size * 0.5, l.size * 0.25, -l.size);
+          ctx.quadraticCurveTo(0, -l.size * 0.75, -l.size * 0.25, -l.size);
+          ctx.bezierCurveTo(-l.size * 0.85, -l.size * 0.5, -l.size * 0.75, l.size * 0.4, 0, l.size);
+          ctx.fill();
 
-        ctx.strokeStyle = l.vein;
-        ctx.lineWidth = 0.6;
-        ctx.beginPath();
-        ctx.moveTo(0, -l.size * 0.85);
-        ctx.lineTo(0, l.size * 0.85);
-        ctx.stroke();
+          ctx.strokeStyle = l.stroke;
+          ctx.lineWidth = 0.5;
+          ctx.stroke();
+        } else {
+          ctx.fillStyle = l.color;
+          ctx.beginPath();
+          ctx.moveTo(0, -l.size);
+          ctx.bezierCurveTo(l.size * 0.68, -l.size * 0.30, l.size * 0.68, l.size * 0.60, 0, l.size);
+          ctx.bezierCurveTo(-l.size * 0.68, l.size * 0.60, -l.size * 0.68, -l.size * 0.30, 0, -l.size);
+          ctx.fill();
+
+          ctx.strokeStyle = l.stroke;
+          ctx.lineWidth = 0.6;
+          ctx.beginPath();
+          ctx.moveTo(0, -l.size * 0.85);
+          ctx.lineTo(0, l.size * 0.85);
+          ctx.stroke();
+        }
 
         ctx.restore();
       }
@@ -2150,14 +2357,20 @@
     try { window.__AGY_SHELL_RO__.disconnect(); } catch (e) {}
     window.__AGY_SHELL_RO__ = null;
   }
+  if (window.__AGY_DYNAMIC_TIMER__) {
+    clearInterval(window.__AGY_DYNAMIC_TIMER__);
+    window.__AGY_DYNAMIC_TIMER__ = 0;
+  }
+  window.__AGY_DYNAMIC_TIMER__ = setInterval(checkDynamicTheme, 30000);
+
   if (window.__AGY_SCROLL_AC__) {
     try { window.__AGY_SCROLL_AC__.abort(); } catch (e) {}
   }
   window.__AGY_SCROLL_AC__ = new AbortController();
-  window.addEventListener('load', () => scheduleTitleBarSync(), { signal: window.__AGY_SCROLL_AC__.signal });
-  window.addEventListener('focus', () => syncTitleBarOverlay(), { signal: window.__AGY_SCROLL_AC__.signal });
+  window.addEventListener('load', () => { scheduleTitleBarSync(); checkDynamicTheme(); }, { signal: window.__AGY_SCROLL_AC__.signal });
+  window.addEventListener('focus', () => { syncTitleBarOverlay(); checkDynamicTheme(); }, { signal: window.__AGY_SCROLL_AC__.signal });
   document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) syncTitleBarOverlay();
+    if (!document.hidden) { syncTitleBarOverlay(); checkDynamicTheme(); }
   }, { signal: window.__AGY_SCROLL_AC__.signal });
   document.querySelectorAll('[data-agy-scroll-bound]').forEach(el => delete el.dataset.agyScrollBound);
   document.querySelectorAll('[data-agy-tbo-mounted]').forEach(el => delete el.dataset.agyTboMounted);
