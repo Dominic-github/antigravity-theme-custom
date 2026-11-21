@@ -1,0 +1,14 @@
+# Build & runtime outputs
+dist/
+daemon.log
+daemon.pid
+theme_config.json
+silent-start.vbs
+scratch/
+
+# OS / Python / Node junk
+__pycache__/
+*.pyc
+node_modules/
+.DS_Store
+Thumbs.db
