@@ -59,6 +59,8 @@
   const STORAGE_DYNAMIC_START = 'agy_dynamic_start_v3';
   const STORAGE_DYNAMIC_END = 'agy_dynamic_end_v3';
   const STORAGE_PARTICLE_TYPE = 'agy_particle_type_v3';
+  const STORAGE_PARTICLE_COUNT = 'agy_particle_count_v3';
+  const STORAGE_PARTICLE_SPEED = 'agy_particle_speed_v3';
 
   let _lastSw = -1;
   let _lastHdrBottom = -1;
@@ -122,6 +124,10 @@
     const rawEnd = localStorage.getItem(STORAGE_DYNAMIC_END);
     const dynamicEnd = rawEnd !== null ? parseInt(rawEnd, 10) : (init.dynamicEnd !== undefined ? init.dynamicEnd : 16);
     const particleType = localStorage.getItem(STORAGE_PARTICLE_TYPE) || init.particleType || 'auto';
+    const rawCount = localStorage.getItem(STORAGE_PARTICLE_COUNT);
+    const particleCount = rawCount !== null ? parseInt(rawCount, 10) : (init.particleCount !== undefined ? parseInt(init.particleCount, 10) : 18);
+    const rawSpeed = localStorage.getItem(STORAGE_PARTICLE_SPEED);
+    const particleSpeed = rawSpeed !== null ? parseFloat(rawSpeed) : (init.particleSpeed !== undefined ? parseFloat(init.particleSpeed) : 1.0);
 
     try {
       if (localStorage.getItem(STORAGE_THEME) !== themeName) {
@@ -132,7 +138,7 @@
       }
     } catch (_) {}
 
-    return { themeName, bubbleName, inputStyle, dimming, wpEnabled, customWp, userAvatar, agentAvatar, glassBlur, avatarSize, avatarRadius, leavesEnabled, dynamicStart, dynamicEnd, particleType };
+    return { themeName, bubbleName, inputStyle, dimming, wpEnabled, customWp, userAvatar, agentAvatar, glassBlur, avatarSize, avatarRadius, leavesEnabled, dynamicStart, dynamicEnd, particleType, particleCount, particleSpeed };
   }
 
   // Downscale user/agent avatar uploads to 192x192 WebP once so theme_config.json stays tiny
@@ -247,6 +253,14 @@
       }
       if (overrides.particleType !== undefined) {
         localStorage.setItem(STORAGE_PARTICLE_TYPE, overrides.particleType);
+      }
+      if (overrides.particleCount !== undefined) {
+        localStorage.setItem(STORAGE_PARTICLE_COUNT, String(overrides.particleCount));
+        window.__AGY_PARTICLE_TARGET_COUNT__ = overrides.particleCount;
+      }
+      if (overrides.particleSpeed !== undefined) {
+        localStorage.setItem(STORAGE_PARTICLE_SPEED, String(overrides.particleSpeed));
+        window.__AGY_PARTICLE_SPEED__ = overrides.particleSpeed;
       }
     } catch (e) {}
 
@@ -1319,6 +1333,27 @@
               </span>
             </div>
           </div>
+          <div id="agy-particle-controls-row" style="display: ${st.leavesEnabled ? 'flex' : 'none'}; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; background: rgba(244, 114, 182, 0.08); border: 1px solid rgba(244, 114, 182, 0.25); border-radius: 10px; padding: 10px 14px; margin-top: 2px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 16px;">🌸</span>
+              <div>
+                <div style="font-size: 13.5px; font-weight: 600; color: #fbcfe8;">Mật độ & Tốc độ rơi cánh hoa (Particles Tuning)</div>
+                <div style="font-size: 11.5px; color: #94a3b8;">Tùy chỉnh số lượng cánh hoa bay và tốc độ rơi chậm/nhanh theo sở thích.</div>
+              </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 18px; flex-wrap: wrap;">
+              <label style="display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #fce7f3; font-weight: 500;">
+                Số lượng:
+                <input id="agy-particle-count-slider" type="range" min="6" max="48" step="2" value="${st.particleCount}" style="width: 85px; cursor: pointer; accent-color: #f472b6; height: 5px;" />
+                <span id="agy-particle-count-val" style="min-width: 24px; text-align: right; font-weight: 600; color: #f472b6;">${st.particleCount}</span>
+              </label>
+              <label style="display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #fce7f3; font-weight: 500;">
+                Tốc độ rơi:
+                <input id="agy-particle-speed-slider" type="range" min="20" max="250" step="10" value="${Math.round(st.particleSpeed * 100)}" style="width: 85px; cursor: pointer; accent-color: #f472b6; height: 5px;" />
+                <span id="agy-particle-speed-val" style="min-width: 34px; text-align: right; font-weight: 600; color: #f472b6;">${st.particleSpeed.toFixed(1)}x</span>
+              </label>
+            </div>
+          </div>
         </div>
 
         <div style="border: 1px solid ${mainTheme.borderColor}; background: ${mainTheme.cardBg || 'rgba(22, 16, 14, 0.72)'}; border-radius: 12px; padding: 14px 20px; margin-bottom: 24px; display: flex; flex-direction: column; gap: 10px;">
@@ -1518,9 +1553,34 @@
     });
 
     const leavesToggle = container.querySelector('#agy-leaves-toggle');
+    const particleControlsRow = container.querySelector('#agy-particle-controls-row');
     if (leavesToggle) {
       leavesToggle.addEventListener('change', (e) => {
+        if (particleControlsRow) {
+          particleControlsRow.style.display = e.target.checked ? 'flex' : 'none';
+        }
         applyTheme({ leavesEnabled: e.target.checked });
+      });
+    }
+
+    const countSlider = container.querySelector('#agy-particle-count-slider');
+    const countVal = container.querySelector('#agy-particle-count-val');
+    if (countSlider) {
+      countSlider.addEventListener('input', (e) => {
+        const v = parseInt(e.target.value, 10);
+        if (countVal) countVal.textContent = String(v);
+        applyTheme({ particleCount: v });
+      });
+    }
+
+    const speedSlider = container.querySelector('#agy-particle-speed-slider');
+    const speedVal = container.querySelector('#agy-particle-speed-val');
+    if (speedSlider) {
+      speedSlider.addEventListener('input', (e) => {
+        const raw = parseInt(e.target.value, 10);
+        const v = Math.round(raw) / 100;
+        if (speedVal) speedVal.textContent = v.toFixed(1) + 'x';
+        applyTheme({ particleSpeed: v });
       });
     }
 
@@ -1702,7 +1762,7 @@
             throw new Error('Config must be a JSON object');
           }
           const allowed = {};
-          const keys = ['themeName', 'bubbleName', 'inputStyle', 'dimming', 'wpEnabled', 'customWp', 'userAvatar', 'agentAvatar', 'glassBlur', 'avatarSize', 'avatarRadius'];
+          const keys = ['themeName', 'bubbleName', 'inputStyle', 'dimming', 'wpEnabled', 'customWp', 'userAvatar', 'agentAvatar', 'glassBlur', 'avatarSize', 'avatarRadius', 'leavesEnabled', 'dynamicStart', 'dynamicEnd', 'particleType', 'particleCount', 'particleSpeed'];
           keys.forEach((k) => {
             if (parsed[k] !== undefined) allowed[k] = parsed[k];
           });
@@ -1727,6 +1787,12 @@
       localStorage.removeItem(STORAGE_INPUT);
       localStorage.removeItem(STORAGE_DIMMING);
       localStorage.removeItem(STORAGE_WP_ENABLED);
+      localStorage.removeItem(STORAGE_LEAVES_ENABLED);
+      localStorage.removeItem(STORAGE_DYNAMIC_START);
+      localStorage.removeItem(STORAGE_DYNAMIC_END);
+      localStorage.removeItem(STORAGE_PARTICLE_TYPE);
+      localStorage.removeItem(STORAGE_PARTICLE_COUNT);
+      localStorage.removeItem(STORAGE_PARTICLE_SPEED);
       applyTheme({
         themeName: DEFAULT_THEME_KEY,
         bubbleName: DEFAULT_THEME_KEY,
@@ -1738,7 +1804,13 @@
         agentAvatar: '',
         glassBlur: 3,
         avatarSize: 32,
-        avatarRadius: 50
+        avatarRadius: 50,
+        leavesEnabled: true,
+        dynamicStart: 6,
+        dynamicEnd: 16,
+        particleType: 'auto',
+        particleCount: 18,
+        particleSpeed: 1.0
       });
       const defTh = THEMES[DEFAULT_THEME_KEY] || {};
       syncAvPreview(userAvPreview, defTh.userAvatar || '', 'U');
@@ -1754,6 +1826,12 @@
       if (avRadSlider) avRadSlider.value = 50;
       if (avRadVal) avRadVal.textContent = '50%';
       if (wpToggle) wpToggle.checked = true;
+      if (leavesToggle) leavesToggle.checked = true;
+      if (particleControlsRow) particleControlsRow.style.display = 'flex';
+      if (countSlider) countSlider.value = 18;
+      if (countVal) countVal.textContent = '18';
+      if (speedSlider) speedSlider.value = 100;
+      if (speedVal) speedVal.textContent = '1.0x';
 
       container.querySelectorAll('.agy-preset-card').forEach(c => {
         const isSel = c.dataset.name === DEFAULT_THEME_KEY;
@@ -2162,6 +2240,9 @@
       ? st.particleType
       : (activeMainTh.particleType || 'sakura');
 
+    window.__AGY_PARTICLE_SPEED__ = typeof st.particleSpeed === 'number' ? st.particleSpeed : 1.0;
+    window.__AGY_PARTICLE_TARGET_COUNT__ = typeof st.particleCount === 'number' ? st.particleCount : (particleMode === 'sakura' ? 18 : 14);
+
     if (canvas.dataset.running === '1' && canvas.dataset.mode === particleMode) return;
     canvas.dataset.running = '1';
     canvas.dataset.mode = particleMode;
@@ -2238,7 +2319,8 @@
       return p;
     }
 
-    for (let i = 0; i < PARTICLE_COUNT; i++) {
+    const initTargetCount = window.__AGY_PARTICLE_TARGET_COUNT__ || (particleMode === 'sakura' ? 18 : 14);
+    for (let i = 0; i < initTargetCount; i++) {
       particles.push(resetParticle({}, false));
     }
 
@@ -2263,19 +2345,29 @@
         return;
       }
 
+      const targetCount = window.__AGY_PARTICLE_TARGET_COUNT__ || 18;
+      while (particles.length < targetCount) {
+        particles.push(resetParticle({}, true));
+      }
+      while (particles.length > targetCount) {
+        particles.pop();
+      }
+
+      const speedMult = window.__AGY_PARTICLE_SPEED__ || 1.0;
       const elapsed = now - lastTime;
       lastTime = now;
       const dt = Math.min(2.0, Math.max(0.4, elapsed / 16.67));
+      const spd = speedMult * dt;
 
       ctx.clearRect(0, 0, width, height);
 
       for (let i = 0; i < particles.length; i++) {
         const l = particles[i];
-        l.swing += l.swingSpeed * dt;
-        l.angle += l.vAngle * dt;
-        l.flip += l.vFlip * dt;
-        l.y += l.vy * dt;
-        l.x += (l.wind + Math.sin(l.swing) * l.swingAmp) * dt;
+        l.swing += l.swingSpeed * spd;
+        l.angle += l.vAngle * spd;
+        l.flip += l.vFlip * spd;
+        l.y += l.vy * spd;
+        l.x += (l.wind + Math.sin(l.swing) * l.swingAmp) * spd;
 
         if (l.y > height + 25 || l.x > width + 25) {
           resetParticle(l, true);
