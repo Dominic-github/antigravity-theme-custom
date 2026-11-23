@@ -2245,7 +2245,7 @@
     window.__AGY_PARTICLE_SPEED__ = typeof st.particleSpeed === 'number' ? st.particleSpeed : 1.0;
     window.__AGY_PARTICLE_TARGET_COUNT__ = typeof st.particleCount === 'number' ? st.particleCount : (particleMode === 'sakura' ? 18 : 14);
 
-    if (canvas.dataset.running === '1' && canvas.dataset.mode === particleMode) return;
+    if (canvas.dataset.running === '1' && canvas.dataset.mode === particleMode && window.__AGY_LEAVES_RAF__) return;
     canvas.dataset.running = '1';
     canvas.dataset.mode = particleMode;
 
@@ -2327,33 +2327,19 @@
     }
 
     let isVisible = !document.hidden;
-    let isFocused = (typeof document.hasFocus === 'function') ? document.hasFocus() : true;
-    let blurTimestamp = isFocused ? 0 : performance.now();
-    let lastRenderTime = performance.now();
-
-    function wakeAnimation() {
-      blurTimestamp = 0;
-      isFocused = true;
+    const onVisibility = () => {
+      isVisible = !document.hidden;
       if (isVisible && !window.__AGY_LEAVES_RAF__) {
         lastTime = performance.now();
         lastRenderTime = lastTime;
         window.__AGY_LEAVES_RAF__ = requestAnimationFrame(render);
       }
-    }
-
-    const onVisibility = () => {
-      isVisible = !document.hidden;
-      if (isVisible) wakeAnimation();
     };
     document.addEventListener('visibilitychange', onVisibility, { passive: true });
-    window.addEventListener('focus', wakeAnimation, { passive: true });
-    window.addEventListener('blur', () => {
-      isFocused = false;
-      blurTimestamp = performance.now();
-    }, { passive: true });
-    window.addEventListener('pointerenter', wakeAnimation, { passive: true });
 
     let lastTime = performance.now();
+    let lastRenderTime = performance.now();
+
     function render(now) {
       if (!canvas || !canvas.isConnected) {
         window.__AGY_LEAVES_RAF__ = 0;
@@ -2364,18 +2350,9 @@
         return;
       }
 
-      // Smart sleep: if this window has lost focus for > 6 seconds, sleep RAF completely
-      // to yield 100% GPU/CPU power to the active window. Wakes instantly on hover or focus!
-      if (!isFocused && blurTimestamp > 0 && (now - blurTimestamp) > 6000) {
-        window.__AGY_LEAVES_RAF__ = 0;
-        return;
-      }
-
-      // FPS Throttling: Cap at 60 FPS when focused (protects 120Hz/144Hz screens), 15 FPS when unfocused
-      const targetFps = isFocused ? 60 : 15;
-      const minInterval = 1000 / targetFps;
+      // Smooth 60 FPS cap (15ms min interval) to avoid 120Hz/240Hz GPU overload
       const deltaSinceLastRender = now - lastRenderTime;
-      if (deltaSinceLastRender < minInterval - 1) {
+      if (deltaSinceLastRender < 15) {
         window.__AGY_LEAVES_RAF__ = requestAnimationFrame(render);
         return;
       }
