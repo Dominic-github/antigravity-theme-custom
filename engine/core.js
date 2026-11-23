@@ -328,7 +328,7 @@
       [class*="--shell-canvas"],
       .agy-shell div.absolute.bottom-0.pointer-events-none,
       .agy-shell [class*="z-50"] .pointer-events-none.right-full,
-      .agy-shell .bg-background:not(.settings-modal-container):not(.settings-modal-container *):not(#agy-custom-theme-modal-backdrop *) {
+      .agy-shell .bg-background:not(.settings-modal-container):not(.settings-modal-container *):not(#agy-custom-theme-modal-backdrop *):not(.agy-overlay):not(.agy-overlay *):not([data-popover-popup]):not([data-popover-popup] *):not([data-select-popup]):not([data-select-popup] *):not([role="dialog"] *):not([role="listbox"] *):not([role="menu"] *) {
         background: transparent !important;
         background-color: transparent !important;
         background-image: none !important;
@@ -873,7 +873,7 @@
                     opacity 0.16s cubic-bezier(0.16, 1, 0.3, 1) !important;
       }
 
-      /* Floating dropdown menus, popovers, and context menus (zero-lag instant rendering) */
+      /* Floating dropdown menus, popovers, select popups, host pickers, and context menus (zero-lag instant rendering) */
       .agy-shell .surface-opaque,
       .surface-opaque,
       [data-browser-occluder="true"],
@@ -881,18 +881,35 @@
       [role="listbox"],
       [data-radix-menu-content],
       [data-radix-popper-content-wrapper] > div,
+      [data-popover-popup],
+      [data-select-popup],
+      .agy-overlay,
+      .agy-overlay.surface-glass,
+      .surface-glass[data-popover-popup],
+      .surface-glass[data-select-popup],
+      [cmdk-root],
+      [cmdk-list],
       div.border-menu-border,
       .agy-shell [data-browser-occluder="true"],
       .agy-shell [role="menu"],
       .agy-shell [role="listbox"],
       .agy-shell [data-radix-menu-content],
       .agy-shell [data-radix-popper-content-wrapper] > div,
+      .agy-shell [data-popover-popup],
+      .agy-shell [data-select-popup],
+      .agy-shell .agy-overlay,
+      .agy-shell .agy-overlay.surface-glass,
+      .agy-shell .surface-glass[data-popover-popup],
+      .agy-shell .surface-glass[data-select-popup],
+      .agy-shell [cmdk-root],
+      .agy-shell [cmdk-list],
       .agy-shell div.border-menu-border {
         background: ${modalBg || 'rgba(9, 14, 26, 0.98)'} !important;
+        background-color: ${modalBg || 'rgba(9, 14, 26, 0.98)'} !important;
         backdrop-filter: none !important;
         -webkit-backdrop-filter: none !important;
-        border: 1px solid ${mainTheme.borderColor || 'rgba(56, 189, 248, 0.28)'} !important;
-        box-shadow: 0 10px 28px rgba(0, 0, 0, 0.85) !important;
+        border: 1px solid ${mainTheme.borderColor || 'rgba(56, 189, 248, 0.35)'} !important;
+        box-shadow: 0 16px 40px rgba(0, 0, 0, 0.9), 0 0 1px 1px ${mainTheme.borderColor || 'rgba(56, 189, 248, 0.25)'} !important;
         border-radius: 8px !important;
         overflow: hidden !important;
         -webkit-app-region: no-drag !important;
@@ -905,18 +922,131 @@
       .agy-shell [data-testid="title-menu-bar-item"] {
         transition: background-color 0.08s ease, color 0.08s ease !important;
       }
+
+      /* Group headings & section labels inside menus, popovers, cmdk (Recent, SSH Config, Switch To...) */
+      .agy-shell [data-popover-popup] [role="presentation"].text-muted-foreground,
+      .agy-shell [data-select-popup] [role="presentation"].text-muted-foreground,
+      .agy-shell .agy-overlay [role="presentation"].text-muted-foreground,
+      .agy-shell [role="listbox"] [role="presentation"].text-muted-foreground,
+      .agy-shell [role="menu"] [role="presentation"].text-muted-foreground,
+      .agy-shell [cmdk-group-heading],
+      .agy-shell [data-radix-popper-content-wrapper] [cmdk-group-heading],
+      .agy-shell [role="group"] > div:first-child,
+      [data-popover-popup] [role="presentation"].text-muted-foreground,
+      [data-select-popup] [role="presentation"].text-muted-foreground,
+      .agy-overlay [role="presentation"].text-muted-foreground,
+      [role="listbox"] [role="presentation"].text-muted-foreground,
+      [role="menu"] [role="presentation"].text-muted-foreground,
+      [cmdk-group-heading],
+      [data-radix-popper-content-wrapper] [cmdk-group-heading],
+      [role="group"] > div:first-child {
+        color: #93c5fd !important;
+        font-weight: 600 !important;
+        font-size: 11px !important;
+        letter-spacing: 0.05em !important;
+        text-transform: uppercase !important;
+        padding: 6px 8px 3px 8px !important;
+        opacity: 1 !important;
+        line-height: 1.3 !important;
+      }
+
+      /* Search inputs inside popovers & command palettes (e.g. Search Hosts...) */
+      .agy-shell [data-popover-popup] input,
+      .agy-shell [data-select-popup] input,
+      .agy-shell .agy-overlay input,
+      .agy-shell [cmdk-input],
+      .agy-shell input[placeholder*="Search Hosts"],
+      [data-popover-popup] input,
+      [data-select-popup] input,
+      .agy-overlay input,
+      [cmdk-input],
+      input[placeholder*="Search Hosts"] {
+        background: rgba(255, 255, 255, 0.06) !important;
+        color: #ffffff !important;
+        font-size: 13px !important;
+        font-weight: 500 !important;
+        border: none !important;
+        border-bottom: 1px solid ${mainTheme.borderColor || 'rgba(56, 189, 248, 0.3)'} !important;
+        border-radius: 6px 6px 0 0 !important;
+        padding: 8px 12px !important;
+        outline: none !important;
+        width: 100% !important;
+      }
+      .agy-shell [data-popover-popup] input::placeholder,
+      .agy-shell [data-select-popup] input::placeholder,
+      .agy-shell .agy-overlay input::placeholder,
+      .agy-shell [cmdk-input]::placeholder,
+      .agy-shell input[placeholder*="Search Hosts"]::placeholder,
+      [data-popover-popup] input::placeholder,
+      [data-select-popup] input::placeholder,
+      .agy-overlay input::placeholder,
+      [cmdk-input]::placeholder,
+      input[placeholder*="Search Hosts"]::placeholder {
+        color: rgba(203, 213, 225, 0.65) !important;
+      }
+
+      /* Options and items in menus, listboxes, cmdk */
       .agy-shell [data-testid="title-menu-bar-option"],
       .agy-shell [role="menuitem"],
-      .agy-shell [role="option"] {
+      .agy-shell [role="option"],
+      .agy-shell [cmdk-item],
+      .agy-shell .agy-overlay-item,
+      [data-testid="title-menu-bar-option"],
+      [role="menuitem"],
+      [role="option"],
+      [cmdk-item],
+      .agy-overlay-item {
         color: ${mainTheme.textColor || '#f8fafc'} !important;
+        font-size: 13px !important;
+        font-weight: 500 !important;
+        border-radius: 6px !important;
         transition: background-color 0.08s ease, color 0.08s ease !important;
       }
       .agy-shell [data-testid="title-menu-bar-option"]:hover,
       .agy-shell [role="menuitem"]:hover,
       .agy-shell [role="option"]:hover,
-      .agy-shell [data-highlighted] {
-        background: ${sidebarHoverBg || 'rgba(56, 189, 248, 0.22)'} !important;
+      .agy-shell [role="option"][aria-selected="true"],
+      .agy-shell [role="option"][data-highlighted],
+      .agy-shell [cmdk-item]:hover,
+      .agy-shell [cmdk-item][data-selected="true"],
+      .agy-shell .agy-overlay-item:hover,
+      .agy-shell .agy-overlay-item:focus,
+      .agy-shell [data-highlighted],
+      [data-testid="title-menu-bar-option"]:hover,
+      [role="menuitem"]:hover,
+      [role="option"]:hover,
+      [role="option"][aria-selected="true"],
+      [role="option"][data-highlighted],
+      [cmdk-item]:hover,
+      [cmdk-item][data-selected="true"],
+      .agy-overlay-item:hover,
+      .agy-overlay-item:focus,
+      [data-highlighted] {
+        background: ${sidebarHoverBg || 'rgba(56, 189, 248, 0.28)'} !important;
         color: #ffffff !important;
+        font-weight: 600 !important;
+      }
+
+      /* Divider lines */
+      .agy-shell [data-popover-popup] .border-t,
+      .agy-shell [data-select-popup] .border-t,
+      .agy-shell .agy-overlay .border-t,
+      .agy-shell [role="listbox"] .border-t,
+      [data-popover-popup] .border-t,
+      [data-select-popup] .border-t,
+      .agy-overlay .border-t,
+      [role="listbox"] .border-t {
+        border-color: rgba(147, 197, 253, 0.22) !important;
+        margin: 4px 0 !important;
+      }
+
+      /* Connected / active SSH status header */
+      [data-testid="ssh-machine-switcher-status"] {
+        color: #38bdf8 !important;
+        font-weight: 500 !important;
+      }
+      [data-testid="ssh-machine-switcher-status"] svg {
+        color: #34d399 !important;
       }
       /* Preserve virtual list positioning; hide sticky headers only while scrolled */
       .agy-shell .bg-sidebar .agy-scrolled > .w-full.relative > .bg-sidebar[style*="position: sticky"] {
