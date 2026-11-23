@@ -91,15 +91,15 @@
   function getState() {
     const init = window.__AGY_INITIAL_CONFIG__ || {};
     const localTheme = localStorage.getItem(STORAGE_THEME);
-    const rawTheme = (localTheme && THEMES[localTheme])
-      ? localTheme
-      : (init.themeName && THEMES[init.themeName] ? init.themeName : (THEMES['Railway Horizon'] ? 'Railway Horizon' : (THEMES['Crimson Horizon'] ? 'Crimson Horizon' : DEFAULT_THEME_KEY)));
+    const rawTheme = (init.themeName && THEMES[init.themeName])
+      ? init.themeName
+      : (localTheme && THEMES[localTheme] ? localTheme : (THEMES['Railway Horizon'] ? 'Railway Horizon' : (THEMES['Crimson Horizon'] ? 'Crimson Horizon' : DEFAULT_THEME_KEY)));
     const themeName = THEMES[rawTheme] ? rawTheme : DEFAULT_THEME_KEY;
 
     const localBubble = localStorage.getItem(STORAGE_BUBBLE);
-    const rawBubble = (localBubble && THEMES[localBubble])
-      ? localBubble
-      : (init.bubbleName && THEMES[init.bubbleName] ? init.bubbleName : themeName);
+    const rawBubble = (init.bubbleName && THEMES[init.bubbleName])
+      ? init.bubbleName
+      : (localBubble && THEMES[localBubble] ? localBubble : themeName);
     const bubbleName = THEMES[rawBubble] ? rawBubble : themeName;
 
     const inputStyle = localStorage.getItem(STORAGE_INPUT) || init.inputStyle || 'sync';
@@ -215,7 +215,7 @@
     img.src = wpUrl;
   }
 
-  function applyTheme(overrides = {}) {
+  function applyTheme(overrides = {}, isUserAction = false) {
     const st = { ...getState(), ...overrides };
     window.__AGY_INITIAL_CONFIG__ = { ...(window.__AGY_INITIAL_CONFIG__ || {}), ...st };
     try {
@@ -264,7 +264,9 @@
       }
     } catch (e) {}
 
-    if (window.agySaveThemeConfig) {
+    // ONLY broadcast saveConfig to daemon when triggered by explicit user action
+    // to prevent infinite multi-window re-injection ping-pong loops!
+    if (isUserAction && window.agySaveThemeConfig) {
       try {
         window.agySaveThemeConfig(JSON.stringify(st));
       } catch (e) {}
@@ -1190,7 +1192,7 @@
   window.__AGY_GET_STATE__ = getState;
   window.__AGY_THEMES__ = THEMES;
 
-  applyTheme();
+  applyTheme({}, false);
 
   function openCustomThemeModal() {
     let backdrop = document.getElementById('agy-custom-theme-modal-backdrop');
@@ -1544,12 +1546,12 @@
     slider.addEventListener('input', (e) => {
       const v = parseInt(e.target.value, 10);
       valLabel.textContent = v + '%';
-      applyTheme({ dimming: v });
+      applyTheme({ dimming: v }, true);
     });
 
     const wpToggle = container.querySelector('#agy-wp-toggle');
     wpToggle.addEventListener('change', (e) => {
-      applyTheme({ wpEnabled: e.target.checked });
+      applyTheme({ wpEnabled: e.target.checked }, true);
     });
 
     const leavesToggle = container.querySelector('#agy-leaves-toggle');
@@ -1559,7 +1561,7 @@
         if (particleControlsRow) {
           particleControlsRow.style.display = e.target.checked ? 'flex' : 'none';
         }
-        applyTheme({ leavesEnabled: e.target.checked });
+        applyTheme({ leavesEnabled: e.target.checked }, true);
       });
     }
 
@@ -1569,7 +1571,7 @@
       countSlider.addEventListener('input', (e) => {
         const v = parseInt(e.target.value, 10);
         if (countVal) countVal.textContent = String(v);
-        applyTheme({ particleCount: v });
+        applyTheme({ particleCount: v }, true);
       });
     }
 
@@ -1580,7 +1582,7 @@
         const raw = parseInt(e.target.value, 10);
         const v = Math.round(raw) / 100;
         if (speedVal) speedVal.textContent = v.toFixed(1) + 'x';
-        applyTheme({ particleSpeed: v });
+        applyTheme({ particleSpeed: v }, true);
       });
     }
 
@@ -1594,7 +1596,7 @@
         if (particleLabel) {
           particleLabel.textContent = effectiveMode === 'sakura' ? '🌸 Hoa anh đào rơi' : '🍂 Lá vàng rơi';
         }
-        applyTheme({ particleType: mode });
+        applyTheme({ particleType: mode }, true);
       });
     }
 
@@ -1616,7 +1618,7 @@
         const s = parseInt(dynStartSelect.value, 10);
         const e = parseInt(dynEndSelect.value, 10);
         updateDynamicBadge(s, e);
-        applyTheme({ dynamicStart: s, dynamicEnd: e });
+        applyTheme({ dynamicStart: s, dynamicEnd: e }, true);
       };
       dynStartSelect.addEventListener('change', onScheduleChange);
       dynEndSelect.addEventListener('change', onScheduleChange);
@@ -1628,7 +1630,7 @@
       if (!file) return;
       const reader = new FileReader();
       reader.onload = () => {
-        applyTheme({ customWp: reader.result, wpEnabled: true });
+        applyTheme({ customWp: reader.result, wpEnabled: true }, true);
         const toggle = container.querySelector('#agy-wp-toggle');
         if (toggle) toggle.checked = true;
       };
@@ -1660,14 +1662,14 @@
         const file = e.target.files && e.target.files[0];
         if (!file) return;
         compressAvatarFile(file, (dataUrl) => {
-          applyTheme({ userAvatar: dataUrl });
+          applyTheme({ userAvatar: dataUrl }, true);
           syncAvPreview(userAvPreview, dataUrl, 'U');
         });
       });
     }
     if (userAvClear) {
       userAvClear.addEventListener('click', () => {
-        applyTheme({ userAvatar: 'none' });
+        applyTheme({ userAvatar: 'none' }, true);
         syncAvPreview(userAvPreview, '', 'U');
       });
     }
@@ -1676,14 +1678,14 @@
         const file = e.target.files && e.target.files[0];
         if (!file) return;
         compressAvatarFile(file, (dataUrl) => {
-          applyTheme({ agentAvatar: dataUrl });
+          applyTheme({ agentAvatar: dataUrl }, true);
           syncAvPreview(agentAvPreview, dataUrl, 'AI');
         });
       });
     }
     if (agentAvClear) {
       agentAvClear.addEventListener('click', () => {
-        applyTheme({ agentAvatar: 'none' });
+        applyTheme({ agentAvatar: 'none' }, true);
         syncAvPreview(agentAvPreview, '', 'AI');
       });
     }
@@ -1694,7 +1696,7 @@
       blurSlider.addEventListener('input', (e) => {
         const v = parseInt(e.target.value, 10);
         if (blurLabel) blurLabel.textContent = v + 'px';
-        applyTheme({ glassBlur: v });
+        applyTheme({ glassBlur: v }, true);
       });
     }
 
@@ -1704,7 +1706,7 @@
       avSizeSlider.addEventListener('input', (e) => {
         const v = parseInt(e.target.value, 10);
         if (avSizeVal) avSizeVal.textContent = v + 'px';
-        applyTheme({ avatarSize: v });
+        applyTheme({ avatarSize: v }, true);
       });
     }
 
@@ -1716,7 +1718,7 @@
         if (avRadVal) avRadVal.textContent = v + '%';
         if (userAvPreview) userAvPreview.style.borderRadius = v + '%';
         if (agentAvPreview) agentAvPreview.style.borderRadius = v + '%';
-        applyTheme({ avatarRadius: v });
+        applyTheme({ avatarRadius: v }, true);
       });
     }
 
@@ -1766,7 +1768,7 @@
           keys.forEach((k) => {
             if (parsed[k] !== undefined) allowed[k] = parsed[k];
           });
-          applyTheme(allowed);
+          applyTheme(allowed, true);
           renderThemePanels(container);
         } catch (err) {
           if (importMsg) importMsg.textContent = 'Invalid JSON: ' + err.message;
@@ -1811,7 +1813,7 @@
         particleType: 'auto',
         particleCount: 18,
         particleSpeed: 1.0
-      });
+      }, true);
       const defTh = THEMES[DEFAULT_THEME_KEY] || {};
       syncAvPreview(userAvPreview, defTh.userAvatar || '', 'U');
       syncAvPreview(agentAvPreview, defTh.agentAvatar || '', 'AI');
@@ -1859,7 +1861,7 @@
     container.querySelectorAll('.agy-preset-card').forEach(card => {
       card.addEventListener('click', () => {
         const name = card.dataset.name;
-        applyTheme({ themeName: name, bubbleName: name, customWp: '' });
+        applyTheme({ themeName: name, bubbleName: name, customWp: '' }, true);
 
         const chosenTh = THEMES[name];
         if (dynScheduleBox) {
@@ -1894,7 +1896,7 @@
     container.querySelectorAll('.agy-bubble-card').forEach(card => {
       card.addEventListener('click', () => {
         const name = card.dataset.name;
-        applyTheme({ bubbleName: name });
+        applyTheme({ bubbleName: name }, true);
 
         container.querySelectorAll('.agy-bubble-card').forEach(b => {
           const isSel = b.dataset.name === name;
@@ -1911,7 +1913,7 @@
     container.querySelectorAll('.agy-input-card').forEach(card => {
       card.addEventListener('click', () => {
         const styleKey = card.dataset.style;
-        applyTheme({ inputStyle: styleKey });
+        applyTheme({ inputStyle: styleKey }, true);
 
         container.querySelectorAll('.agy-input-card').forEach(c => {
           const isSel = c.dataset.style === styleKey;
@@ -2159,7 +2161,7 @@
     const currentSub = getDynamicSubThemeName(st.themeName, st);
     if (window.__AGY_CURRENT_DYNAMIC_SUBTHEME__ && window.__AGY_CURRENT_DYNAMIC_SUBTHEME__ !== currentSub) {
       window.__AGY_CURRENT_DYNAMIC_SUBTHEME__ = currentSub;
-      applyTheme(st);
+      applyTheme(st, false);
     }
   }
 

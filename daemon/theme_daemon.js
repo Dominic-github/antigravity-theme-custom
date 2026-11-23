@@ -219,6 +219,18 @@ function createSession(target) {
         }, 150);
     };
 
+    session.syncConfig = (newCfg) => {
+        const payloadStr = JSON.stringify(newCfg);
+        send('Runtime.evaluate', {
+            expression: `(() => {
+                if (typeof window.__AGY_APPLY_THEME__ === 'function') {
+                    window.__AGY_APPLY_THEME__(${payloadStr}, false);
+                }
+            })()`,
+            awaitPromise: false
+        }).catch(() => {});
+    };
+
     ws.addEventListener('message', async (event) => {
         let msg;
         try {
@@ -238,10 +250,15 @@ function createSession(target) {
         if (msg.method === 'Runtime.bindingCalled' && msg.params && msg.params.name === 'agySaveThemeConfig') {
             try {
                 const payload = JSON.parse(msg.params.payload || '{}');
-                saveConfig(payload);
+                const prev = readConfig();
+                const isDifferent = Object.keys(payload).some(k => JSON.stringify(payload[k]) !== JSON.stringify(prev[k]));
+                if (!isDifferent) return;
+
+                const merged = saveConfig(payload);
+                log(`Config updated from target ${target.id}: themeName=${merged.themeName}`);
                 for (const other of sessions.values()) {
                     if (other.id !== target.id) {
-                        other.reinject();
+                        other.syncConfig(merged);
                     }
                 }
             } catch (err) {
