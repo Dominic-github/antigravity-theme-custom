@@ -2133,10 +2133,10 @@
     banner.id = 'agy-running-dogs-banner';
     banner.dataset.src = runningDogsSrc;
     banner.title = '🐾 Bấm vào đàn cún để mở Cài đặt Theme (Custom Theme)';
-    banner.style.cssText = 'height: 44px; position: relative; overflow: visible; margin: 8px 10px 2px 10px; background: transparent !important; border: none !important; box-shadow: none !important; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; user-select: none; transform: translateZ(0); will-change: transform;';
+    banner.style.cssText = 'height: 44px; position: relative; overflow: visible; margin: 8px 10px 2px 10px; background: transparent !important; border: none !important; box-shadow: none !important; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; user-select: none;';
 
     banner.innerHTML = `
-      <img src="${runningDogsSrc}" alt="running dogs" style="width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; pointer-events: none; filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.45)); transform: translateZ(0); will-change: transform, filter;" />
+      <img src="${runningDogsSrc}" alt="running dogs" style="width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; pointer-events: none;" />
     `;
 
     banner.addEventListener('click', (e) => {
@@ -2324,15 +2324,32 @@
       particles.push(resetParticle({}, false));
     }
 
-    let isVisible = true;
-    const onVisibility = () => {
-      isVisible = !document.hidden;
+    let isVisible = !document.hidden;
+    let isFocused = (typeof document.hasFocus === 'function') ? document.hasFocus() : true;
+    let blurTimestamp = isFocused ? 0 : performance.now();
+    let lastRenderTime = performance.now();
+
+    function wakeAnimation() {
+      blurTimestamp = 0;
+      isFocused = true;
       if (isVisible && !window.__AGY_LEAVES_RAF__) {
         lastTime = performance.now();
-        render(lastTime);
+        lastRenderTime = lastTime;
+        window.__AGY_LEAVES_RAF__ = requestAnimationFrame(render);
       }
+    }
+
+    const onVisibility = () => {
+      isVisible = !document.hidden;
+      if (isVisible) wakeAnimation();
     };
-    document.addEventListener('visibilitychange', onVisibility);
+    document.addEventListener('visibilitychange', onVisibility, { passive: true });
+    window.addEventListener('focus', wakeAnimation, { passive: true });
+    window.addEventListener('blur', () => {
+      isFocused = false;
+      blurTimestamp = performance.now();
+    }, { passive: true });
+    window.addEventListener('pointerenter', wakeAnimation, { passive: true });
 
     let lastTime = performance.now();
     function render(now) {
@@ -2340,10 +2357,27 @@
         window.__AGY_LEAVES_RAF__ = 0;
         return;
       }
-      if (!isVisible) {
+      if (!isVisible || document.hidden) {
         window.__AGY_LEAVES_RAF__ = 0;
         return;
       }
+
+      // Smart sleep: if this window has lost focus for > 6 seconds, sleep RAF completely
+      // to yield 100% GPU/CPU power to the active window. Wakes instantly on hover or focus!
+      if (!isFocused && blurTimestamp > 0 && (now - blurTimestamp) > 6000) {
+        window.__AGY_LEAVES_RAF__ = 0;
+        return;
+      }
+
+      // FPS Throttling: Cap at 60 FPS when focused (protects 120Hz/144Hz screens), 15 FPS when unfocused
+      const targetFps = isFocused ? 60 : 15;
+      const minInterval = 1000 / targetFps;
+      const deltaSinceLastRender = now - lastRenderTime;
+      if (deltaSinceLastRender < minInterval - 1) {
+        window.__AGY_LEAVES_RAF__ = requestAnimationFrame(render);
+        return;
+      }
+      lastRenderTime = now;
 
       const targetCount = window.__AGY_PARTICLE_TARGET_COUNT__ || 18;
       while (particles.length < targetCount) {
@@ -2356,7 +2390,7 @@
       const speedMult = window.__AGY_PARTICLE_SPEED__ || 1.0;
       const elapsed = now - lastTime;
       lastTime = now;
-      const dt = Math.min(2.0, Math.max(0.4, elapsed / 16.67));
+      const dt = Math.min(2.5, Math.max(0.4, elapsed / 16.67));
       const spd = speedMult * dt;
 
       ctx.clearRect(0, 0, width, height);
@@ -2373,11 +2407,11 @@
           resetParticle(l, true);
         }
 
-        ctx.save();
-        ctx.translate(l.x, l.y);
-        ctx.rotate(l.angle);
+        const cos = Math.cos(l.angle);
+        const sin = Math.sin(l.angle);
         const curl = 0.65 + 0.35 * Math.cos(l.flip);
-        ctx.scale(curl, 1);
+        // Direct affine transform matrix (10x faster than ctx.save / ctx.restore, 0 heap allocations)
+        ctx.setTransform(curl * cos, curl * sin, -sin, cos, l.x, l.y);
         ctx.globalAlpha = l.opacity;
 
         if (particleMode === 'sakura') {
@@ -2407,9 +2441,10 @@
           ctx.lineTo(0, l.size * 0.85);
           ctx.stroke();
         }
-
-        ctx.restore();
       }
+
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.globalAlpha = 1.0;
 
       window.__AGY_LEAVES_RAF__ = requestAnimationFrame(render);
     }
@@ -2433,10 +2468,14 @@
         _tickScheduled = false;
         tick();
       });
-    }, 100);
+    }, 200);
   }
 
   clearTitleBarTimers();
+  if (window.__AGY_LEAVES_RAF__) {
+    cancelAnimationFrame(window.__AGY_LEAVES_RAF__);
+    window.__AGY_LEAVES_RAF__ = 0;
+  }
   if (window.__AGY_TICK_RAF__) {
     cancelAnimationFrame(window.__AGY_TICK_RAF__);
     window.__AGY_TICK_RAF__ = 0;

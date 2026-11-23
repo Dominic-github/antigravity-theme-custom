@@ -359,7 +359,8 @@ let lastShortcutPatch = 0;
 function patchShortcuts() {
     if (process.platform !== 'win32') return;
     const now = Date.now();
-    if (now - lastShortcutPatch < 25000) return;
+    // Only patch shortcuts once on startup, and at most once every 12 hours (avoid spawning powershell repeatedly)
+    if (lastShortcutPatch > 0 && now - lastShortcutPatch < 12 * 3600 * 1000) return;
     lastShortcutPatch = now;
 
     const psScript = `
@@ -447,11 +448,11 @@ async function scanPages() {
         if (!sessions.has(page.id)) {
             createSession(page);
         } else {
-            // Heartbeat: verify theme is still active in attached DOM (at most once every 5s per target)
+            // Heartbeat: verify theme is still active in attached DOM (at most once every 30s per target)
             const session = sessions.get(page.id);
             const now = Date.now();
             if (session && session.ws && session.ws.readyState === 1 && typeof session.send === 'function') {
-                if (!session.lastCheck || now - session.lastCheck > 5000) {
+                if (!session.lastCheck || now - session.lastCheck > 30000) {
                     session.lastCheck = now;
                     session.send('Runtime.evaluate', {
                         expression: 'Boolean(document.getElementById("antigravity-custom-theme-active"))',
@@ -518,4 +519,4 @@ process.on('exit', removePidLock);
 log(`Theme daemon started (PID ${process.pid}, platform=${process.platform}, portFile=${resolvePortFile()}).`);
 watchPayload();
 scanPages();
-setInterval(scanPages, 1500);
+setInterval(scanPages, 8000);
