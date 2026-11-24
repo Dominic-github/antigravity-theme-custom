@@ -313,16 +313,16 @@
     const init = window.__AGY_INITIAL_CONFIG__ || {};
     const localTheme = normalizeThemeKey(localStorage.getItem(STORAGE_THEME));
     const initTheme = normalizeThemeKey(init.themeName);
-    const rawTheme = (localTheme && THEMES[localTheme])
-      ? localTheme
-      : (initTheme && THEMES[initTheme] ? initTheme : DEFAULT_THEME_KEY);
+    const rawTheme = (initTheme && THEMES[initTheme])
+      ? initTheme
+      : (localTheme && THEMES[localTheme] ? localTheme : DEFAULT_THEME_KEY);
     const themeName = THEMES[rawTheme] ? rawTheme : DEFAULT_THEME_KEY;
 
     const localBubble = normalizeThemeKey(localStorage.getItem(STORAGE_BUBBLE));
     const initBubble = normalizeThemeKey(init.bubbleName);
-    const rawBubble = (localBubble && THEMES[localBubble])
-      ? localBubble
-      : (initBubble && THEMES[initBubble] ? initBubble : themeName);
+    const rawBubble = (initBubble && THEMES[initBubble])
+      ? initBubble
+      : (localBubble && THEMES[localBubble] ? localBubble : themeName);
     const bubbleName = THEMES[rawBubble] ? rawBubble : themeName;
 
     const inputStyle = localStorage.getItem(STORAGE_INPUT) || init.inputStyle || 'sync';
@@ -452,7 +452,7 @@
     img.src = wpUrl;
   }
 
-  function applyTheme(overrides = {}) {
+  function applyTheme(overrides = {}, isUserAction = false) {
     const st = { ...getState(), ...overrides };
     window.__AGY_INITIAL_CONFIG__ = { ...(window.__AGY_INITIAL_CONFIG__ || {}), ...st };
     try {
@@ -521,7 +521,9 @@
       }
     } catch (e) {}
 
-    if (window.agySaveThemeConfig) {
+    // ONLY broadcast saveConfig to daemon when triggered by explicit user action
+    // to prevent infinite multi-window re-injection ping-pong loops!
+    if (isUserAction && window.agySaveThemeConfig) {
       try {
         window.agySaveThemeConfig(JSON.stringify(st));
       } catch (e) {}
@@ -595,7 +597,7 @@
       [class*="--shell-canvas"],
       .agy-shell div.absolute.bottom-0.pointer-events-none,
       .agy-shell [class*="z-50"] .pointer-events-none.right-full,
-      body:not([data-has-browser-hole="true"]) .agy-shell .bg-background:not(.settings-modal-container):not(.settings-modal-container *):not(#agy-custom-theme-modal-backdrop *) {
+      body:not([data-has-browser-hole="true"]) .agy-shell .bg-background:not(.settings-modal-container):not(.settings-modal-container *):not(#agy-custom-theme-modal-backdrop *):not(.agy-overlay):not(.agy-overlay *):not([data-popover-popup]):not([data-popover-popup] *):not([data-select-popup]):not([data-select-popup] *):not([role="dialog"] *):not([role="listbox"] *):not([role="menu"] *) {
         background: transparent !important;
         background-color: transparent !important;
         background-image: none !important;
@@ -1148,7 +1150,7 @@
                     opacity 0.16s cubic-bezier(0.16, 1, 0.3, 1) !important;
       }
 
-      /* Floating dropdown menus, popovers, and context menus (zero-lag instant rendering) */
+      /* Floating dropdown menus, popovers, select popups, host pickers, and context menus (zero-lag instant rendering) */
       .agy-shell .surface-opaque,
       .surface-opaque,
       [data-browser-occluder="true"],
@@ -1156,14 +1158,31 @@
       [role="listbox"],
       [data-radix-menu-content],
       [data-radix-popper-content-wrapper] > div,
+      [data-popover-popup],
+      [data-select-popup],
+      .agy-overlay,
+      .agy-overlay.surface-glass,
+      .surface-glass[data-popover-popup],
+      .surface-glass[data-select-popup],
+      [cmdk-root],
+      [cmdk-list],
       div.border-menu-border,
       .agy-shell [data-browser-occluder="true"],
       .agy-shell [role="menu"],
       .agy-shell [role="listbox"],
       .agy-shell [data-radix-menu-content],
       .agy-shell [data-radix-popper-content-wrapper] > div,
+      .agy-shell [data-popover-popup],
+      .agy-shell [data-select-popup],
+      .agy-shell .agy-overlay,
+      .agy-shell .agy-overlay.surface-glass,
+      .agy-shell .surface-glass[data-popover-popup],
+      .agy-shell .surface-glass[data-select-popup],
+      .agy-shell [cmdk-root],
+      .agy-shell [cmdk-list],
       .agy-shell div.border-menu-border {
         background: #121216 !important;
+        background-color: #121216 !important;
         backdrop-filter: none !important;
         -webkit-backdrop-filter: none !important;
         border: 1px solid rgba(255, 255, 255, 0.10) !important;
@@ -1180,18 +1199,131 @@
       .agy-shell [data-testid="title-menu-bar-item"] {
         transition: background-color 0.08s ease, color 0.08s ease !important;
       }
+
+      /* Group headings & section labels inside menus, popovers, cmdk (Recent, SSH Config, Switch To...) */
+      .agy-shell [data-popover-popup] [role="presentation"].text-muted-foreground,
+      .agy-shell [data-select-popup] [role="presentation"].text-muted-foreground,
+      .agy-shell .agy-overlay [role="presentation"].text-muted-foreground,
+      .agy-shell [role="listbox"] [role="presentation"].text-muted-foreground,
+      .agy-shell [role="menu"] [role="presentation"].text-muted-foreground,
+      .agy-shell [cmdk-group-heading],
+      .agy-shell [data-radix-popper-content-wrapper] [cmdk-group-heading],
+      .agy-shell [role="group"] > div:first-child,
+      [data-popover-popup] [role="presentation"].text-muted-foreground,
+      [data-select-popup] [role="presentation"].text-muted-foreground,
+      .agy-overlay [role="presentation"].text-muted-foreground,
+      [role="listbox"] [role="presentation"].text-muted-foreground,
+      [role="menu"] [role="presentation"].text-muted-foreground,
+      [cmdk-group-heading],
+      [data-radix-popper-content-wrapper] [cmdk-group-heading],
+      [role="group"] > div:first-child {
+        color: #93c5fd !important;
+        font-weight: 600 !important;
+        font-size: 11px !important;
+        letter-spacing: 0.05em !important;
+        text-transform: uppercase !important;
+        padding: 6px 8px 3px 8px !important;
+        opacity: 1 !important;
+        line-height: 1.3 !important;
+      }
+
+      /* Search inputs inside popovers & command palettes (e.g. Search Hosts...) */
+      .agy-shell [data-popover-popup] input,
+      .agy-shell [data-select-popup] input,
+      .agy-shell .agy-overlay input,
+      .agy-shell [cmdk-input],
+      .agy-shell input[placeholder*="Search Hosts"],
+      [data-popover-popup] input,
+      [data-select-popup] input,
+      .agy-overlay input,
+      [cmdk-input],
+      input[placeholder*="Search Hosts"] {
+        background: rgba(255, 255, 255, 0.06) !important;
+        color: #ffffff !important;
+        font-size: 13px !important;
+        font-weight: 500 !important;
+        border: none !important;
+        border-bottom: 1px solid ${mainTheme.borderColor || 'rgba(56, 189, 248, 0.3)'} !important;
+        border-radius: 6px 6px 0 0 !important;
+        padding: 8px 12px !important;
+        outline: none !important;
+        width: 100% !important;
+      }
+      .agy-shell [data-popover-popup] input::placeholder,
+      .agy-shell [data-select-popup] input::placeholder,
+      .agy-shell .agy-overlay input::placeholder,
+      .agy-shell [cmdk-input]::placeholder,
+      .agy-shell input[placeholder*="Search Hosts"]::placeholder,
+      [data-popover-popup] input::placeholder,
+      [data-select-popup] input::placeholder,
+      .agy-overlay input::placeholder,
+      [cmdk-input]::placeholder,
+      input[placeholder*="Search Hosts"]::placeholder {
+        color: rgba(203, 213, 225, 0.65) !important;
+      }
+
+      /* Options and items in menus, listboxes, cmdk */
       .agy-shell [data-testid="title-menu-bar-option"],
       .agy-shell [role="menuitem"],
-      .agy-shell [role="option"] {
+      .agy-shell [role="option"],
+      .agy-shell [cmdk-item],
+      .agy-shell .agy-overlay-item,
+      [data-testid="title-menu-bar-option"],
+      [role="menuitem"],
+      [role="option"],
+      [cmdk-item],
+      .agy-overlay-item {
         color: ${mainTheme.textColor || '#f8fafc'} !important;
+        font-size: 13px !important;
+        font-weight: 500 !important;
+        border-radius: 6px !important;
         transition: background-color 0.08s ease, color 0.08s ease !important;
       }
       .agy-shell [data-testid="title-menu-bar-option"]:hover,
       .agy-shell [role="menuitem"]:hover,
       .agy-shell [role="option"]:hover,
-      .agy-shell [data-highlighted] {
-        background: ${sidebarHoverBg || 'rgba(56, 189, 248, 0.22)'} !important;
+      .agy-shell [role="option"][aria-selected="true"],
+      .agy-shell [role="option"][data-highlighted],
+      .agy-shell [cmdk-item]:hover,
+      .agy-shell [cmdk-item][data-selected="true"],
+      .agy-shell .agy-overlay-item:hover,
+      .agy-shell .agy-overlay-item:focus,
+      .agy-shell [data-highlighted],
+      [data-testid="title-menu-bar-option"]:hover,
+      [role="menuitem"]:hover,
+      [role="option"]:hover,
+      [role="option"][aria-selected="true"],
+      [role="option"][data-highlighted],
+      [cmdk-item]:hover,
+      [cmdk-item][data-selected="true"],
+      .agy-overlay-item:hover,
+      .agy-overlay-item:focus,
+      [data-highlighted] {
+        background: ${sidebarHoverBg || 'rgba(56, 189, 248, 0.28)'} !important;
         color: #ffffff !important;
+        font-weight: 600 !important;
+      }
+
+      /* Divider lines */
+      .agy-shell [data-popover-popup] .border-t,
+      .agy-shell [data-select-popup] .border-t,
+      .agy-shell .agy-overlay .border-t,
+      .agy-shell [role="listbox"] .border-t,
+      [data-popover-popup] .border-t,
+      [data-select-popup] .border-t,
+      .agy-overlay .border-t,
+      [role="listbox"] .border-t {
+        border-color: rgba(147, 197, 253, 0.22) !important;
+        margin: 4px 0 !important;
+      }
+
+      /* Connected / active SSH status header */
+      [data-testid="ssh-machine-switcher-status"] {
+        color: #38bdf8 !important;
+        font-weight: 500 !important;
+      }
+      [data-testid="ssh-machine-switcher-status"] svg {
+        color: #34d399 !important;
       }
       /* Preserve virtual list positioning; hide sticky headers only while scrolled */
       .agy-shell .bg-sidebar .agy-scrolled > .w-full.relative > .bg-sidebar[style*="position: sticky"] {
@@ -1750,7 +1882,7 @@
     const rootDef = THEMES[st.themeName] || {};
     const pCfg = resolveThemeParticleConfig(st, st.themeName);
     if (rootDef.isWeatherDynamic || pCfg.effectiveMode === 'weather') {
-      applyTheme(st);
+      applyTheme(st, false);
     } else if (typeof injectWeatherHud === 'function') {
       injectWeatherHud(st);
     }
@@ -1768,7 +1900,7 @@
   };
 
   stopWeatherAudio();
-  applyTheme();
+  applyTheme({}, false);
 
   function openCustomThemeModal() {
     let backdrop = document.getElementById('agy-custom-theme-modal-backdrop');
@@ -2262,14 +2394,14 @@
       slider.addEventListener('input', (e) => {
         const v = parseInt(e.target.value, 10);
         if (valLabel) valLabel.textContent = v + '%';
-        applyTheme({ dimming: v });
+        applyTheme({ dimming: v }, true);
       });
     }
 
     const wpToggle = container.querySelector('#agy-wp-toggle');
     if (wpToggle) {
       wpToggle.addEventListener('change', (e) => {
-        applyTheme({ wpEnabled: e.target.checked });
+        applyTheme({ wpEnabled: e.target.checked }, true);
       });
     }
 
@@ -2283,7 +2415,7 @@
           enabled: e.target.checked,
           type: curCfg.selectedType
         };
-        applyTheme({ themeParticles: nextMap });
+        applyTheme({ themeParticles: nextMap }, true);
         rerenderKeepScroll();
       });
     }
@@ -2299,7 +2431,7 @@
           enabled: ptype === 'auto' ? (curCfg.defaultType !== 'none') : true,
           type: ptype
         };
-        applyTheme({ themeParticles: nextMap });
+        applyTheme({ themeParticles: nextMap }, true);
         rerenderKeepScroll();
       });
     });
@@ -2307,7 +2439,7 @@
     const quickParticleSound = container.querySelector('#agy-particle-sound-quick');
     if (quickParticleSound) {
       quickParticleSound.addEventListener('change', (e) => {
-        applyTheme({ soundEnabled: e.target.checked });
+        applyTheme({ soundEnabled: e.target.checked }, true);
       });
     }
 
@@ -2317,7 +2449,7 @@
       countSlider.addEventListener('input', (e) => {
         const v = parseInt(e.target.value, 10);
         if (countVal) countVal.textContent = String(v);
-        applyTheme({ particleCount: v });
+        applyTheme({ particleCount: v }, true);
       });
     }
 
@@ -2328,7 +2460,7 @@
         const raw = parseInt(e.target.value, 10);
         const v = Math.round(raw) / 100;
         if (speedVal) speedVal.textContent = v.toFixed(1) + 'x';
-        applyTheme({ particleSpeed: v });
+        applyTheme({ particleSpeed: v }, true);
       });
     }
 
@@ -2349,7 +2481,7 @@
     if (weatherSoundToggle) {
       weatherSoundToggle.addEventListener('change', (e) => {
         if (weatherVolumeSlider) weatherVolumeSlider.style.opacity = e.target.checked ? '1' : '0.4';
-        applyTheme({ soundEnabled: e.target.checked });
+        applyTheme({ soundEnabled: e.target.checked }, true);
       });
     }
 
@@ -2357,7 +2489,7 @@
       weatherVolumeSlider.addEventListener('input', (e) => {
         const v = parseInt(e.target.value, 10);
         if (weatherVolumeVal) weatherVolumeVal.textContent = v + '%';
-        applyTheme({ soundVolume: v });
+        applyTheme({ soundVolume: v }, true);
       });
     }
 
@@ -2379,7 +2511,7 @@
     if (weatherCityApply && weatherCityInput) {
       const applyCity = () => {
         const cityVal = weatherCityInput.value.trim();
-        applyTheme({ weatherCity: cityVal });
+        applyTheme({ weatherCity: cityVal }, true);
         if (typeof window.agyRequestWeatherRefresh === 'function') {
           try {
             window.agyRequestWeatherRefresh(JSON.stringify({ force: true, city: cityVal }));
@@ -2395,7 +2527,7 @@
     if (weatherCityAuto && weatherCityInput) {
       weatherCityAuto.addEventListener('click', () => {
         weatherCityInput.value = '';
-        applyTheme({ weatherCity: '' });
+        applyTheme({ weatherCity: '' }, true);
         if (typeof window.agyRequestWeatherRefresh === 'function') {
           try {
             window.agyRequestWeatherRefresh(JSON.stringify({ force: true, city: '' }));
@@ -2406,14 +2538,14 @@
 
     if (timeOverrideSelect) {
       timeOverrideSelect.addEventListener('change', (e) => {
-        applyTheme({ timeOverride: e.target.value });
+        applyTheme({ timeOverride: e.target.value }, true);
         rerenderKeepScroll();
       });
     }
 
     if (weatherOverrideSelect) {
       weatherOverrideSelect.addEventListener('change', (e) => {
-        applyTheme({ weatherOverride: e.target.value });
+        applyTheme({ weatherOverride: e.target.value }, true);
         rerenderKeepScroll();
       });
     }
@@ -2425,7 +2557,7 @@
         if (dynStatusBadge) {
           dynStatusBadge.textContent = isHourDaytime(new Date().getHours(), s, e) ? 'Ban ngày' : 'Hoàng hôn';
         }
-        applyTheme({ dynamicStart: s, dynamicEnd: e });
+        applyTheme({ dynamicStart: s, dynamicEnd: e }, true);
       };
       dynStartSelect.addEventListener('change', onScheduleChange);
       dynEndSelect.addEventListener('change', onScheduleChange);
@@ -2438,7 +2570,7 @@
         if (!file) return;
         const reader = new FileReader();
         reader.onload = () => {
-          applyTheme({ customWp: reader.result, wpEnabled: true });
+          applyTheme({ customWp: reader.result, wpEnabled: true }, true);
           const toggle = container.querySelector('#agy-wp-toggle');
           if (toggle) toggle.checked = true;
         };
@@ -2471,14 +2603,14 @@
         const file = e.target.files && e.target.files[0];
         if (!file) return;
         compressAvatarFile(file, (dataUrl) => {
-          applyTheme({ userAvatar: dataUrl });
+          applyTheme({ userAvatar: dataUrl }, true);
           syncAvPreview(userAvPreview, dataUrl, 'U');
         });
       });
     }
     if (userAvClear) {
       userAvClear.addEventListener('click', () => {
-        applyTheme({ userAvatar: 'none' });
+        applyTheme({ userAvatar: 'none' }, true);
         syncAvPreview(userAvPreview, '', 'U');
       });
     }
@@ -2487,14 +2619,14 @@
         const file = e.target.files && e.target.files[0];
         if (!file) return;
         compressAvatarFile(file, (dataUrl) => {
-          applyTheme({ agentAvatar: dataUrl });
+          applyTheme({ agentAvatar: dataUrl }, true);
           syncAvPreview(agentAvPreview, dataUrl, 'AI');
         });
       });
     }
     if (agentAvClear) {
       agentAvClear.addEventListener('click', () => {
-        applyTheme({ agentAvatar: 'none' });
+        applyTheme({ agentAvatar: 'none' }, true);
         syncAvPreview(agentAvPreview, '', 'AI');
       });
     }
@@ -2505,7 +2637,7 @@
       blurSlider.addEventListener('input', (e) => {
         const v = parseInt(e.target.value, 10);
         if (blurLabel) blurLabel.textContent = v + 'px';
-        applyTheme({ glassBlur: v });
+        applyTheme({ glassBlur: v }, true);
       });
     }
 
@@ -2515,7 +2647,7 @@
       avSizeSlider.addEventListener('input', (e) => {
         const v = parseInt(e.target.value, 10);
         if (avSizeVal) avSizeVal.textContent = v + 'px';
-        applyTheme({ avatarSize: v });
+        applyTheme({ avatarSize: v }, true);
       });
     }
 
@@ -2527,7 +2659,7 @@
         if (avRadVal) avRadVal.textContent = v + '%';
         if (userAvPreview) userAvPreview.style.borderRadius = v + '%';
         if (agentAvPreview) agentAvPreview.style.borderRadius = v + '%';
-        applyTheme({ avatarRadius: v });
+        applyTheme({ avatarRadius: v }, true);
       });
     }
 
@@ -2578,7 +2710,7 @@
           keys.forEach((k) => {
             if (parsed[k] !== undefined) allowed[k] = parsed[k];
           });
-          applyTheme(allowed);
+          applyTheme(allowed, true);
           renderThemePanels(container);
         } catch (err) {
           if (importMsg) importMsg.textContent = err.message;
@@ -2636,7 +2768,7 @@
           timeOverride: 'auto',
           soundEnabled: true,
           soundVolume: 42
-        });
+        }, true);
         renderThemePanels(container);
       });
     }
@@ -2644,7 +2776,7 @@
     container.querySelectorAll('.agy-preset-card').forEach(card => {
       card.addEventListener('click', () => {
         const name = card.dataset.name;
-        applyTheme({ themeName: name, bubbleName: name, customWp: '' });
+        applyTheme({ themeName: name, bubbleName: name, customWp: '' }, true);
         rerenderKeepScroll();
       });
     });
@@ -2652,7 +2784,7 @@
     container.querySelectorAll('.agy-bubble-card').forEach(card => {
       card.addEventListener('click', () => {
         const name = card.dataset.name;
-        applyTheme({ bubbleName: name });
+        applyTheme({ bubbleName: name }, true);
         container.querySelectorAll('.agy-bubble-card').forEach(b => {
           const isSel = b.dataset.name === name;
           b.style.border = isSel ? '1px solid rgba(255, 255, 255, 0.34)' : '1px solid rgba(255, 255, 255, 0.08)';
@@ -2667,7 +2799,7 @@
     container.querySelectorAll('.agy-input-card').forEach(card => {
       card.addEventListener('click', () => {
         const styleKey = card.dataset.style;
-        applyTheme({ inputStyle: styleKey });
+        applyTheme({ inputStyle: styleKey }, true);
         container.querySelectorAll('.agy-input-card').forEach(c => {
           const isSel = c.dataset.style === styleKey;
           c.style.border = isSel ? '1px solid rgba(255, 255, 255, 0.34)' : '1px solid rgba(255, 255, 255, 0.08)';
@@ -2912,10 +3044,10 @@
     banner.id = 'agy-running-dogs-banner';
     banner.dataset.src = runningDogsSrc;
     banner.title = '🐾 Bấm vào đàn cún để mở Cài đặt Theme (Custom Theme)';
-    banner.style.cssText = 'height: 44px; position: relative; overflow: visible; margin: 8px 10px 2px 10px; background: transparent !important; border: none !important; box-shadow: none !important; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; user-select: none; transform: translateZ(0); will-change: transform;';
+    banner.style.cssText = 'height: 44px; position: relative; overflow: visible; margin: 8px 10px 2px 10px; background: transparent !important; border: none !important; box-shadow: none !important; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; user-select: none;';
 
     banner.innerHTML = `
-      <img src="${runningDogsSrc}" alt="running dogs" style="width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; pointer-events: none; filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.45)); transform: translateZ(0); will-change: transform, filter;" />
+      <img src="${runningDogsSrc}" alt="running dogs" style="width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; pointer-events: none;" />
     `;
 
     banner.addEventListener('click', (e) => {
@@ -2999,7 +3131,7 @@
           eng.ctx.resume().then(() => injectWeatherHud(getState())).catch(() => {});
           return;
         }
-        applyTheme({ soundEnabled: !cur.soundEnabled });
+        applyTheme({ soundEnabled: !cur.soundEnabled }, true);
         return;
       }
       e.preventDefault();
@@ -3047,14 +3179,14 @@
       if (window.__AGY_CURRENT_WEATHER_SIG__ && window.__AGY_CURRENT_WEATHER_SIG__ !== sig) {
         window.__AGY_CURRENT_WEATHER_SIG__ = sig;
         window.__AGY_CURRENT_DYNAMIC_SUBTHEME__ = sub;
-        applyTheme(st);
+        applyTheme(st, false);
       }
       return;
     }
     const currentSub = getDynamicSubThemeName(st.themeName, st);
     if (window.__AGY_CURRENT_DYNAMIC_SUBTHEME__ && window.__AGY_CURRENT_DYNAMIC_SUBTHEME__ !== currentSub) {
       window.__AGY_CURRENT_DYNAMIC_SUBTHEME__ = currentSub;
-      applyTheme(st);
+      applyTheme(st, false);
     }
   }
 
@@ -3695,7 +3827,7 @@
     window.__AGY_PARTICLE_SPEED__ = typeof st.particleSpeed === 'number' ? st.particleSpeed : 1.0;
     window.__AGY_PARTICLE_TARGET_COUNT__ = typeof st.particleCount === 'number' ? st.particleCount : (particleMode === 'sakura' ? 18 : 22);
 
-    if (canvas.dataset.running === '1' && canvas.dataset.mode === modeSig) return;
+    if (canvas.dataset.running === '1' && canvas.dataset.mode === modeSig && window.__AGY_LEAVES_RAF__) return;
     canvas.dataset.running = '1';
     canvas.dataset.mode = modeSig;
 
@@ -4252,6 +4384,7 @@
 
     let isVisible = !document.hidden;
     let lastTime = performance.now();
+    let lastRenderTime = performance.now();
 
     function drawStarSparkle(x, y, r, alpha) {
       ctx.save();
@@ -4290,14 +4423,21 @@
     }
 
     function renderWeather(now) {
-      if (!canvas || !canvas.isConnected || !isVisible) {
+      if (!canvas || !canvas.isConnected || !isVisible || document.hidden) {
         window.__AGY_LEAVES_RAF__ = 0;
         return;
       }
 
+      // Smooth 60 FPS cap (15ms min interval) to avoid 120Hz/240Hz GPU overload
+      if (now - lastRenderTime < 15) {
+        window.__AGY_LEAVES_RAF__ = requestAnimationFrame(renderWeather);
+        return;
+      }
+      lastRenderTime = now;
+
       const elapsed = now - lastTime;
       lastTime = now;
-      const dt = Math.min(2.0, Math.max(0.4, elapsed / 16.67));
+      const dt = Math.min(2.5, Math.max(0.4, elapsed / 16.67));
       const speedMult = window.__AGY_PARTICLE_SPEED__ || 1.0;
       const spd = speedMult * dt;
       const tSec = now * 0.001;
@@ -4686,7 +4826,7 @@
         }
       }
 
-      // --- J) Luminous WLOP Sun Motes / Night Golden Town Embers / Mist Dew ---
+      // --- J) Luminous Sun Motes / Night Golden Town Embers / Mist Dew ---
       if (baseMoteCount > 0) {
         const targetMotes = Math.round(baseMoteCount * densityScale);
         while (motes.length < targetMotes) motes.push(resetMote({}, true));
@@ -4735,10 +4875,14 @@
         _tickScheduled = false;
         tick();
       });
-    }, 100);
+    }, 200);
   }
 
   clearTitleBarTimers();
+  if (window.__AGY_LEAVES_RAF__) {
+    cancelAnimationFrame(window.__AGY_LEAVES_RAF__);
+    window.__AGY_LEAVES_RAF__ = 0;
+  }
   if (window.__AGY_TICK_RAF__) {
     cancelAnimationFrame(window.__AGY_TICK_RAF__);
     window.__AGY_TICK_RAF__ = 0;
