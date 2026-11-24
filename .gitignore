@@ -3,6 +3,7 @@ dist/
 daemon.log
 daemon.pid
 theme_config.json
+weather_cache.json
 silent-start.vbs
 scratch/
 
