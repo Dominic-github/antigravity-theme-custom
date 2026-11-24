@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 144 38" fill="none">
+  <defs>
+    <linearGradient id="dfLine" x1="0%" y1="50%" x2="100%" y2="50%">
+      <stop offset="0%" stop-color="#9ca3af" stop-opacity="0.08"/>
+      <stop offset="28%" stop-color="#b48a4e" stop-opacity="0.82"/>
+      <stop offset="50%" stop-color="#e7d3a8" stop-opacity="0.98"/>
+      <stop offset="72%" stop-color="#b48a4e" stop-opacity="0.82"/>
+      <stop offset="100%" stop-color="#9ca3af" stop-opacity="0.08"/>
+    </linearGradient>
+    <linearGradient id="dfSpire" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ede0c8"/>
+      <stop offset="55%" stop-color="#b48a4e"/>
+      <stop offset="100%" stop-color="#5c401d"/>
+    </linearGradient>
+  </defs>
+  <!-- Gothic Iron & Aged Brass Lancet Wings -->
+  <path d="M 6 26 L 34 22 L 54 15 L 72 13 L 90 15 L 110 22 L 138 26" stroke="url(#dfLine)" stroke-width="1.25" stroke-linecap="round"/>
+  <path d="M 20 29 C 38 25, 52 19, 72 19 C 92 19, 106 25, 124 29" stroke="#c8a97e" stroke-width="0.7" opacity="0.48"/>
+  <!-- Wrought-iron gothic thorns -->
+  <path d="M 44 21 L 39 14 L 47 17" stroke="url(#dfSpire)" stroke-width="1.05" stroke-linejoin="miter"/>
+  <path d="M 100 21 L 105 14 L 97 17" stroke="url(#dfSpire)" stroke-width="1.05" stroke-linejoin="miter"/>
+  <!-- Central Dark-Fantasy Cathedral Spire Crest -->
+  <path d="M 72 2 L 75 13 L 83 17 L 75 21 L 72 32 L 69 21 L 61 17 L 69 13 Z" fill="url(#dfSpire)" stroke="#e7d3a8" stroke-width="0.55"/>
+  <path d="M 72 8 L 73.5 17 L 72 26 L 70.5 17 Z" fill="#18181b" opacity="0.65"/>
+  <circle cx="72" cy="17" r="1.8" fill="#ede0c8"/>
+  <!-- Flanking Ash-Gold Stars -->
+  <path d="M 52 12 L 53 9.5 L 55.5 8.5 L 53 7.5 L 52 5 L 51 7.5 L 48.5 8.5 L 51 9.5 Z" fill="#d9be92" opacity="0.85"/>
+  <path d="M 92 12 L 93 9.5 L 95.5 8.5 L 93 7.5 L 92 5 L 91 7.5 L 88.5 8.5 L 91 9.5 Z" fill="#d9be92" opacity="0.85"/>
+</svg>

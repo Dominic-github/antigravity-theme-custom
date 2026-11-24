@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 44 44" fill="none">
+  <defs>
+    <linearGradient id="dfBrass" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#e7d3a8"/>
+      <stop offset="50%" stop-color="#b48a4e"/>
+      <stop offset="100%" stop-color="#6b4c24"/>
+    </linearGradient>
+  </defs>
+  <path d="M 3 34 L 3 11 L 11 3 L 34 3" stroke="url(#dfBrass)" stroke-width="1.5" stroke-linecap="square" opacity="0.88"/>
+  <path d="M 7 25 L 7 13 L 13 7 L 25 7" stroke="#c8a97e" stroke-width="0.85" opacity="0.58"/>
+  <path d="M 10.5 4.5 L 12 9 L 16.5 10.5 L 12 12 L 10.5 16.5 L 9 12 L 4.5 10.5 L 9 9 Z" fill="#d9be92" opacity="0.92"/>
+  <circle cx="35.5" cy="3" r="1.2" fill="#b48a4e" opacity="0.78"/>
+  <circle cx="3" cy="35.5" r="1.2" fill="#b48a4e" opacity="0.78"/>
+</svg>
