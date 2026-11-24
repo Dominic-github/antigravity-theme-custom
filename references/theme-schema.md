@@ -1,6 +1,6 @@
 # `themes/themes.json` Schema & Antigravity DOM Reference
 
-`themes/themes.json` is a JSON object keyed by display preset name (e.g. `"WLOP Cosmic"`, `"Midnight Obsidian"`). The first entry becomes the default fallback theme when no `theme_config.json` selection is stored.
+`themes/themes.json` is a JSON object keyed by display preset name (e.g. `"Ashen Citadel"`, `"Astral Violin"`, `"Midnight Obsidian"`). The first public entry becomes the default fallback theme when no `theme_config.json` selection is stored.
 
 ## Preset Fields
 
@@ -48,6 +48,10 @@
 | `isLight` | boolean | Optional | Enables Light Mode Glass typography (`#0f172a` ink, frosted light pills, dark window controls) |
 | `uiTextColor`, `uiMutedColor` | css color | Optional | Override header/sidebar/body primary and muted ink (defaults adapt to `isLight`) |
 | `pillBg`, `pillHoverBg`, `pillTextColor`, `pillBorder` | css color | Optional | Custom styling for composer strip pills (`No Project`, `Local Checkout`, branch trigger) |
+| `particleType` | string | Optional | Per-theme default falling effect: `"none"`, `"weather"`, `"sakura"`, `"autumn"`, `"ash"`, `"snow"`, `"rain"`, `"feathers"`, `"fireflies"` |
+| `isInternal` | boolean | Optional | Hides sub-themes (e.g., 5 time-of-day variants) from the public preset picker |
+| `isWeatherDynamic` | boolean | Optional | Enables 5-period (`morning`, `noon`, `afternoon`, `evening`, `night`) live weather switching via `timeThemes` map |
+| `timeThemes` | object | Optional | Maps `{ morning, noon, afternoon, evening, night }` to internal theme preset keys |
 
 ## Asset Resolution (`scripts/build_payload.py`)
 
