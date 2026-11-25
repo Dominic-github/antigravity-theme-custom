@@ -109,6 +109,19 @@ def build_payload(themes_path: Path, engine_path: Path, out_path: Path, max_dim:
         raise ValueError("themes.json must be a non-empty JSON object keyed by theme name.")
 
     themes_dir = themes_path.parent
+    asset_cache: dict[tuple[str, int], str] = {}
+
+    def resolve_cached(value: object, target_dim: int) -> object:
+        if not isinstance(value, str):
+            return value
+        cache_key = (value.strip(), target_dim)
+        if cache_key in asset_cache:
+            return asset_cache[cache_key]
+        resolved = resolve_asset_value(value, themes_dir, target_dim)
+        if isinstance(resolved, str):
+            asset_cache[cache_key] = resolved
+        return resolved
+
     resolved_themes: dict[str, dict] = {}
     for name, cfg in themes_raw.items():
         if not isinstance(cfg, dict):
@@ -117,8 +130,49 @@ def build_payload(themes_path: Path, engine_path: Path, out_path: Path, max_dim:
         for key in ASSET_KEYS:
             if key in copied:
                 target_dim = min(max_dim, AVATAR_MAX_DIM) if key in AVATAR_KEYS else max_dim
-                copied[key] = resolve_asset_value(copied[key], themes_dir, target_dim)
+                copied[key] = resolve_cached(copied[key], target_dim)
+        if isinstance(copied.get("seasonTimeWallpapers"), dict):
+            st_map: dict[str, dict[str, object]] = {}
+            for season_key, period_map in copied["seasonTimeWallpapers"].items():
+                if isinstance(period_map, dict):
+                    st_map[season_key] = {
+                        p_key: resolve_cached(p_val, max_dim)
+                        for p_key, p_val in period_map.items()
+                    }
+            copied["seasonTimeWallpapers"] = st_map
         resolved_themes[name] = copied
+
+    # Deduplicate large repeated data: URIs (>= 1 KB) across presets to keep payload compact
+    uri_counts: dict[str, int] = {}
+
+    def count_uris(obj: object) -> None:
+        if isinstance(obj, str):
+            if obj.startswith("data:") and len(obj) >= 1024:
+                uri_counts[obj] = uri_counts.get(obj, 0) + 1
+        elif isinstance(obj, dict):
+            for v in obj.values():
+                count_uris(v)
+        elif isinstance(obj, list):
+            for v in obj:
+                count_uris(v)
+
+    count_uris(resolved_themes)
+    shared_pool: list[str] = []
+    uri_to_token: dict[str, str] = {}
+    for uri, freq in uri_counts.items():
+        if freq >= 2:
+            idx = len(shared_pool)
+            shared_pool.append(uri)
+            uri_to_token[uri] = f"__AGY_ASSET_REF_{idx}__"
+
+    def replace_shared(obj: object) -> object:
+        if isinstance(obj, str):
+            return uri_to_token.get(obj, obj)
+        if isinstance(obj, dict):
+            return {k: replace_shared(v) for k, v in obj.items()}
+        if isinstance(obj, list):
+            return [replace_shared(v) for v in obj]
+        return obj
 
     engine_src = engine_path.read_text(encoding="utf-8")
     count = engine_src.count(PLACEHOLDER)
@@ -127,8 +181,22 @@ def build_payload(themes_path: Path, engine_path: Path, out_path: Path, max_dim:
             f"Expected exactly 1 '{PLACEHOLDER}' placeholder in {engine_path}, found {count}."
         )
 
-    themes_json = json.dumps(resolved_themes, ensure_ascii=False)
-    compiled = engine_src.replace(PLACEHOLDER, themes_json, 1)
+    if shared_pool:
+        compact_themes = replace_shared(resolved_themes)
+        pool_json = json.dumps(shared_pool, ensure_ascii=False)
+        themes_json = json.dumps(compact_themes, ensure_ascii=False)
+        hydrated_expr = (
+            "(() => {"
+            f"const _P={pool_json};"
+            f"const _T={themes_json};"
+            "const _H=(o)=>{if(typeof o==='string'){const m=o.match(/^__AGY_ASSET_REF_(\\d+)__$/);return m?_P[+m[1]]:o;}"
+            "if(o&&typeof o==='object'){for(const k in o){o[k]=_H(o[k]);}}return o;};"
+            "return _H(_T);})()"
+        )
+        compiled = engine_src.replace(PLACEHOLDER, hydrated_expr, 1)
+    else:
+        themes_json = json.dumps(resolved_themes, ensure_ascii=False)
+        compiled = engine_src.replace(PLACEHOLDER, themes_json, 1)
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(compiled, encoding="utf-8")

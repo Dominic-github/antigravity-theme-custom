@@ -51,6 +51,10 @@
 | `particleType` | string | Optional | Per-theme default falling effect: `"none"`, `"weather"`, `"sakura"`, `"autumn"`, `"ash"`, `"snow"`, `"rain"`, `"feathers"`, `"fireflies"` |
 | `isInternal` | boolean | Optional | Hides sub-themes (e.g., 5 time-of-day variants) from the public preset picker |
 | `isWeatherDynamic` | boolean | Optional | Enables 5-period (`morning`, `noon`, `afternoon`, `evening`, `night`) live weather switching via `timeThemes` map |
+| `isSeasonalDynamic` | boolean | Optional | Enables 4-season (`spring`, `summer`, `autumn`, `winter`) × 5-period realtime & override switching with seasonal particle fusion |
+| `seasonTimeWallpapers` | object | Optional | Nested map `{ spring|summer|autumn|winter: { morning|noon|afternoon|evening|night: "assets/..." } }` resolved at build time |
+| `seasonPalettes` | object | Optional | Optional per-season UI palette token overrides (`spring`, `summer`, `autumn`, `winter`) |
+| `periodPalettes` | object | Optional | Optional per-period UI palette token overrides (`morning`, `noon`, `afternoon`, `evening`, `night`) |
 | `timeThemes` | object | Optional | Maps `{ morning, noon, afternoon, evening, night }` to internal theme preset keys |
 
 ## Asset Resolution (`scripts/build_payload.py`)

@@ -23,6 +23,31 @@
     night:     { label: 'Đêm',   icon: '🌙', range: '21:00 - 05:00', isDay: false }
   };
 
+  const SEASONS = {
+    spring: { label: 'Xuân', range: 'Tháng 3 – 5' },
+    summer: { label: 'Hạ',   range: 'Tháng 6 – 8' },
+    autumn: { label: 'Thu',  range: 'Tháng 9 – 11' },
+    winter: { label: 'Đông', range: 'Tháng 12 – 2' }
+  };
+
+  function getSeason(dateObj, overrideVal, liveWeather) {
+    if (overrideVal && overrideVal !== 'auto' && SEASONS[overrideVal]) {
+      return overrideVal;
+    }
+    const m = (dateObj || new Date()).getMonth() + 1;
+    const lat = liveWeather && Number.isFinite(liveWeather.lat) ? liveWeather.lat : 21;
+    let s;
+    if (m >= 3 && m <= 5) s = 'spring';
+    else if (m >= 6 && m <= 8) s = 'summer';
+    else if (m >= 9 && m <= 11) s = 'autumn';
+    else s = 'winter';
+    if (lat < 0) {
+      const flip = { spring: 'autumn', summer: 'winter', autumn: 'spring', winter: 'summer' };
+      return flip[s];
+    }
+    return s;
+  }
+
   const WEATHER_CATALOG = {
     clear:         { label: 'Nắng quang',  nightLabel: 'Quang đãng', icon: '☀️', nightIcon: '✨', windSpeed: 7,  windGusts: 12, cloudCover: 6,   intensity: 0.45 },
     partly_cloudy: { label: 'Ít mây',      nightLabel: 'Ít mây',     icon: '🌤️', nightIcon: '🌙', windSpeed: 10, windGusts: 18, cloudCover: 35,  intensity: 0.40 },
@@ -56,6 +81,9 @@
     const live = (window.__AGY_WEATHER_STATE__ && typeof window.__AGY_WEATHER_STATE__ === 'object')
       ? window.__AGY_WEATHER_STATE__
       : null;
+    const season = getSeason(new Date(), st.seasonOverride, live);
+    const seasonMeta = SEASONS[season] || SEASONS.summer;
+    const rootDef = THEMES[st.themeName] || {};
 
     const overrideCond = (st.weatherOverride && st.weatherOverride !== 'auto' && WEATHER_CATALOG[st.weatherOverride])
       ? st.weatherOverride
@@ -76,8 +104,10 @@
       period,
       periodLabel: periodMeta.label,
       periodIcon: periodMeta.icon,
+      season,
+      seasonLabel: seasonMeta.label,
       isDay,
-      isSimulated: Boolean(overrideCond) || Boolean(st.timeOverride && st.timeOverride !== 'auto'),
+      isSimulated: Boolean(overrideCond) || Boolean(st.timeOverride && st.timeOverride !== 'auto') || Boolean(rootDef.isSeasonalDynamic && st.seasonOverride && st.seasonOverride !== 'auto'),
       city: (live && live.city) ? live.city : (st.weatherCity || 'Vị trí máy'),
       country: (live && live.country) ? live.country : '',
       temperature: live && Number.isFinite(live.temperature) ? Math.round(live.temperature) : null,
@@ -92,48 +122,74 @@
     };
   }
 
-  function buildWeatherAtmosphericOverlay(weather) {
+  function buildWeatherAtmosphericOverlay(weather, isSeasonal) {
     if (!weather) return '';
     const c = weather.condition;
     const isDay = weather.isDay;
+    const season = isSeasonal ? weather.season : null;
+    let base = '';
     switch (c) {
       case 'clear':
-        return isDay
-          ? 'radial-gradient(ellipse at 64% 20%, rgba(255, 236, 178, 0.14) 0%, transparent 58%)'
-          : 'radial-gradient(ellipse at 28% 18%, rgba(186, 220, 255, 0.10) 0%, transparent 55%)';
+        if (season === 'spring' && isDay) {
+          base = 'radial-gradient(ellipse at 64% 20%, rgba(255, 224, 238, 0.14) 0%, transparent 58%)';
+        } else if (season === 'winter' && isDay) {
+          base = 'radial-gradient(ellipse at 66% 18%, rgba(224, 246, 255, 0.18) 0%, transparent 60%)';
+        } else if (season === 'autumn' && isDay) {
+          base = 'radial-gradient(ellipse at 64% 22%, rgba(255, 212, 148, 0.15) 0%, transparent 58%)';
+        } else {
+          base = isDay
+            ? 'radial-gradient(ellipse at 64% 20%, rgba(255, 236, 178, 0.14) 0%, transparent 58%)'
+            : 'radial-gradient(ellipse at 28% 18%, rgba(186, 220, 255, 0.10) 0%, transparent 55%)';
+        }
+        break;
       case 'partly_cloudy':
-        return isDay
+        base = isDay
           ? 'linear-gradient(180deg, rgba(226, 238, 252, 0.06) 0%, transparent 45%)'
           : 'linear-gradient(180deg, rgba(30, 42, 74, 0.10) 0%, transparent 50%)';
+        break;
       case 'mostly_cloudy':
-        return isDay
-          ? 'linear-gradient(180deg, rgba(52, 66, 88, 0.12) 0%, rgba(30, 40, 56, 0.06) 55%, rgba(18, 24, 38, 0.10) 100%)'
+        base = isDay
+          ? (season === 'winter'
+            ? 'linear-gradient(180deg, rgba(64, 86, 118, 0.18) 0%, rgba(44, 64, 92, 0.10) 55%, rgba(24, 38, 60, 0.14) 100%)'
+            : 'linear-gradient(180deg, rgba(52, 66, 88, 0.12) 0%, rgba(30, 40, 56, 0.06) 55%, rgba(18, 24, 38, 0.10) 100%)')
           : 'linear-gradient(180deg, rgba(16, 24, 44, 0.14) 0%, rgba(12, 18, 34, 0.08) 100%)';
+        break;
       case 'overcast':
-        return isDay
-          ? 'linear-gradient(180deg, rgba(44, 52, 66, 0.18) 0%, rgba(32, 38, 50, 0.12) 55%, rgba(20, 24, 34, 0.16) 100%)'
+        base = isDay
+          ? (season === 'winter'
+            ? 'linear-gradient(180deg, rgba(52, 70, 98, 0.28) 0%, rgba(38, 54, 78, 0.20) 55%, rgba(24, 36, 56, 0.24) 100%)'
+            : 'linear-gradient(180deg, rgba(44, 52, 66, 0.18) 0%, rgba(32, 38, 50, 0.12) 55%, rgba(20, 24, 34, 0.16) 100%)')
           : 'linear-gradient(180deg, rgba(16, 20, 30, 0.20) 0%, rgba(12, 16, 24, 0.14) 100%)';
+        break;
       case 'fog':
-        return isDay
+        base = isDay
           ? 'linear-gradient(180deg, rgba(148, 166, 188, 0.16) 0%, rgba(184, 198, 216, 0.22) 64%, rgba(140, 156, 176, 0.24) 100%)'
           : 'linear-gradient(180deg, rgba(72, 88, 112, 0.16) 0%, rgba(92, 108, 134, 0.20) 68%, rgba(56, 70, 92, 0.22) 100%)';
+        break;
       case 'windy':
-        return 'linear-gradient(112deg, rgba(148, 172, 200, 0.08) 0%, transparent 48%, rgba(20, 30, 48, 0.10) 100%)';
+        base = 'linear-gradient(112deg, rgba(148, 172, 200, 0.08) 0%, transparent 48%, rgba(20, 30, 48, 0.10) 100%)';
+        break;
       case 'drizzle':
-        return 'linear-gradient(180deg, rgba(24, 36, 54, 0.16) 0%, rgba(18, 28, 44, 0.12) 100%)';
+        base = 'linear-gradient(180deg, rgba(24, 36, 54, 0.16) 0%, rgba(18, 28, 44, 0.12) 100%)';
+        break;
       case 'rain':
-        return 'linear-gradient(180deg, rgba(14, 24, 42, 0.22) 0%, rgba(10, 18, 34, 0.16) 100%)';
+        base = 'linear-gradient(180deg, rgba(14, 24, 42, 0.22) 0%, rgba(10, 18, 34, 0.16) 100%)';
+        break;
       case 'heavy_rain':
-        return 'linear-gradient(180deg, rgba(10, 18, 34, 0.28) 0%, rgba(8, 14, 28, 0.22) 100%)';
+        base = 'linear-gradient(180deg, rgba(10, 18, 34, 0.28) 0%, rgba(8, 14, 28, 0.22) 100%)';
+        break;
       case 'storm':
-        return 'linear-gradient(180deg, rgba(8, 12, 24, 0.34) 0%, rgba(10, 16, 30, 0.26) 55%, rgba(6, 10, 20, 0.30) 100%)';
+        base = 'linear-gradient(180deg, rgba(8, 12, 24, 0.34) 0%, rgba(10, 16, 30, 0.26) 55%, rgba(6, 10, 20, 0.30) 100%)';
+        break;
       case 'snow':
-        return isDay
+        base = isDay
           ? 'linear-gradient(180deg, rgba(206, 226, 248, 0.22) 0%, rgba(164, 194, 228, 0.14) 100%)'
           : 'linear-gradient(180deg, rgba(124, 156, 198, 0.18) 0%, rgba(44, 66, 98, 0.14) 100%)';
+        break;
       default:
-        return '';
+        base = '';
     }
+    return base;
   }
 
   function isHourDaytime(h, startHour, endHour) {
@@ -148,7 +204,18 @@
 
   function resolveTheme(name, optSt) {
     let th = THEMES[name] || THEMES[DEFAULT_THEME_KEY];
-    if (th && th.isWeatherDynamic && th.timeThemes) {
+    if (th && th.isSeasonalDynamic && th.seasonTimeWallpapers) {
+      const st = optSt || getState();
+      const live = (window.__AGY_WEATHER_STATE__ && typeof window.__AGY_WEATHER_STATE__ === 'object') ? window.__AGY_WEATHER_STATE__ : null;
+      const season = getSeason(new Date(), st.seasonOverride, live);
+      const period = getTimePeriod(new Date(), st.timeOverride);
+      const seasonWpMap = th.seasonTimeWallpapers[season] || th.seasonTimeWallpapers.summer || {};
+      const wp = seasonWpMap[period] || seasonWpMap.noon || th.wallpaper || '';
+      const sPal = (th.seasonPalettes && th.seasonPalettes[season]) || {};
+      const pPal = (th.periodPalettes && th.periodPalettes[period]) || {};
+      const spPal = (th.seasonPeriodOverrides && th.seasonPeriodOverrides[`${season}_${period}`]) || {};
+      th = { ...th, ...sPal, ...pPal, ...spPal, wallpaper: wp };
+    } else if (th && th.isWeatherDynamic && th.timeThemes) {
       const st = optSt || getState();
       const period = getTimePeriod(new Date(), st.timeOverride);
       const targetName = th.timeThemes[period] || th.timeThemes.afternoon || th.timeThemes.morning;
@@ -168,6 +235,15 @@
   function getDynamicSubThemeName(name, optSt) {
     const th = THEMES[name];
     if (!th) return name;
+    if (th.isSeasonalDynamic) {
+      const st = optSt || getState();
+      const live = (window.__AGY_WEATHER_STATE__ && typeof window.__AGY_WEATHER_STATE__ === 'object') ? window.__AGY_WEATHER_STATE__ : null;
+      const season = getSeason(new Date(), st.seasonOverride, live);
+      const period = getTimePeriod(new Date(), st.timeOverride);
+      const sLbl = (SEASONS[season] || SEASONS.summer).label;
+      const pLbl = (TIME_PERIODS[period] || TIME_PERIODS.noon).label;
+      return `${name} (${sLbl} · ${pLbl})`;
+    }
     if (th.isWeatherDynamic && th.timeThemes) {
       const st = optSt || getState();
       const period = getTimePeriod(new Date(), st.timeOverride);
@@ -203,6 +279,7 @@
   const STORAGE_WEATHER_CITY = 'agy_weather_city_v3';
   const STORAGE_WEATHER_OVERRIDE = 'agy_weather_override_v3';
   const STORAGE_TIME_OVERRIDE = 'agy_time_override_v3';
+  const STORAGE_SEASON_OVERRIDE = 'agy_season_override_v3';
   const STORAGE_SOUND_ENABLED = 'agy_weather_sound_v3';
   const STORAGE_SOUND_VOLUME = 'agy_weather_volume_v3';
 
@@ -358,6 +435,7 @@
       : (init.weatherCity || '');
     const weatherOverride = localStorage.getItem(STORAGE_WEATHER_OVERRIDE) || init.weatherOverride || 'auto';
     const timeOverride = localStorage.getItem(STORAGE_TIME_OVERRIDE) || init.timeOverride || 'auto';
+    const seasonOverride = localStorage.getItem(STORAGE_SEASON_OVERRIDE) || init.seasonOverride || 'auto';
     const soundEnabled = localStorage.getItem(STORAGE_SOUND_ENABLED) !== null
       ? localStorage.getItem(STORAGE_SOUND_ENABLED) === 'true'
       : (init.soundEnabled !== undefined ? !!init.soundEnabled : true);
@@ -375,7 +453,7 @@
       }
     } catch (_) {}
 
-    return { themeName, bubbleName, inputStyle, dimming, wpEnabled, customWp, userAvatar, agentAvatar, glassBlur, avatarSize, avatarRadius, leavesEnabled, dynamicStart, dynamicEnd, particleType, themeParticles, particleCount, particleSpeed, weatherCity, weatherOverride, timeOverride, soundEnabled, soundVolume };
+    return { themeName, bubbleName, inputStyle, dimming, wpEnabled, customWp, userAvatar, agentAvatar, glassBlur, avatarSize, avatarRadius, leavesEnabled, dynamicStart, dynamicEnd, particleType, themeParticles, particleCount, particleSpeed, weatherCity, weatherOverride, timeOverride, seasonOverride, soundEnabled, soundVolume };
   }
 
   // Downscale user/agent avatar uploads to 192x192 WebP once so theme_config.json stays tiny
@@ -513,6 +591,9 @@
       if (overrides.timeOverride !== undefined) {
         localStorage.setItem(STORAGE_TIME_OVERRIDE, String(overrides.timeOverride));
       }
+      if (overrides.seasonOverride !== undefined) {
+        localStorage.setItem(STORAGE_SEASON_OVERRIDE, String(overrides.seasonOverride));
+      }
       if (overrides.soundEnabled !== undefined) {
         localStorage.setItem(STORAGE_SOUND_ENABLED, String(overrides.soundEnabled));
       }
@@ -536,12 +617,13 @@
 
     const activeRootDef = THEMES[st.themeName] || {};
     const isWeatherTheme = Boolean(activeRootDef.isWeatherDynamic);
+    const isSeasonalTheme = Boolean(activeRootDef.isSeasonalDynamic);
     const effWeather = getEffectiveWeather(st);
     const mainTheme = resolveTheme(st.themeName, st);
     const bubbleTheme = resolveTheme(st.bubbleName, st);
     const wpUrl = st.customWp || mainTheme.wallpaper || '';
     window.__AGY_CURRENT_DYNAMIC_SUBTHEME__ = getDynamicSubThemeName(st.themeName, st);
-    window.__AGY_CURRENT_WEATHER_SIG__ = `${window.__AGY_CURRENT_DYNAMIC_SUBTHEME__}|${effWeather.condition}|${effWeather.period}`;
+    window.__AGY_CURRENT_WEATHER_SIG__ = `${window.__AGY_CURRENT_DYNAMIC_SUBTHEME__}|${effWeather.season}|${effWeather.condition}|${effWeather.period}`;
 
     const oldLegacy = document.getElementById('antigravity-ho-ly-chibi-theme');
     if (oldLegacy) oldLegacy.remove();
@@ -561,7 +643,7 @@
     const secondaryGlowStop = mainTheme.secondaryGlow
       ? `, radial-gradient(circle at 22% 72%, ${mainTheme.secondaryGlow} 0%, transparent 55%)`
       : '';
-    const weatherOverlay = isWeatherTheme ? buildWeatherAtmosphericOverlay(effWeather) : '';
+    const weatherOverlay = isWeatherTheme ? buildWeatherAtmosphericOverlay(effWeather, isSeasonalTheme) : '';
     const weatherOverlayPrefix = weatherOverlay ? `${weatherOverlay}, ` : '';
 
     let bgLayers = '';
@@ -1964,6 +2046,7 @@
     const activeThDef = THEMES[st.themeName] || {};
     const isDynamicActive = !!activeThDef.isDynamic && !activeThDef.isWeatherDynamic;
     const isWeatherActive = !!activeThDef.isWeatherDynamic;
+    const isSeasonalActive = !!activeThDef.isSeasonalDynamic;
     const effWeather = getEffectiveWeather(st);
     const effUserAv = st.userAvatar === 'none' ? '' : (st.userAvatar || mainTheme.userAvatar || '');
     const effAgentAv = st.agentAvatar === 'none' ? '' : (st.agentAvatar || mainTheme.agentAvatar || '');
@@ -1993,7 +2076,9 @@
               ? `linear-gradient(180deg, rgba(7,7,8,0.06) 0%, rgba(7,7,8,0.72) 100%), url('${thumbWp}')`
               : (th.pureBg || th.bg);
             const cardPCfg = resolveThemeParticleConfig(st, name);
-            const cardMeta = formatParticleChip(cardPCfg, effWeather);
+            const cardMeta = (th.isSeasonalDynamic && cardPCfg.enabled && cardPCfg.effectiveMode === 'weather')
+              ? '4 mùa · Thời tiết'
+              : formatParticleChip(cardPCfg, effWeather);
             return `
               <div class="agy-preset-card" data-name="${name}" style="border-radius: 10px; border: 1px solid ${isSelected ? 'rgba(255, 255, 255, 0.28)' : 'rgba(255, 255, 255, 0.06)'}; background: ${isSelected ? 'rgba(255, 255, 255, 0.05)' : 'rgba(255, 255, 255, 0.015)'}; overflow: hidden; cursor: pointer; display: flex; flex-direction: column;">
                 <div style="height: 66px; width: 100%; background-image: ${thumbBg}; background-size: cover; background-position: ${th.bgPosition || 'center'}; position: relative;">
@@ -2106,6 +2191,18 @@
                 <button id="agy-weather-city-auto" type="button" class="agy-btn">Tự động</button>
               </div>
             </div>
+            ${isSeasonalActive ? `
+              <div class="agy-row">
+                <span class="agy-row-label">Mùa</span>
+                <select id="agy-season-override-select" class="agy-select">
+                  <option value="auto" ${st.seasonOverride === 'auto' ? 'selected' : ''}>Tự động (${effWeather.seasonLabel})</option>
+                  <option value="spring" ${st.seasonOverride === 'spring' ? 'selected' : ''}>Xuân (Hoa anh đào)</option>
+                  <option value="summer" ${st.seasonOverride === 'summer' ? 'selected' : ''}>Hạ (Cây xanh mát)</option>
+                  <option value="autumn" ${st.seasonOverride === 'autumn' ? 'selected' : ''}>Thu (Lá phong rơi)</option>
+                  <option value="winter" ${st.seasonOverride === 'winter' ? 'selected' : ''}>Đông (Tuyết rơi)</option>
+                </select>
+              </div>
+            ` : ''}
             <div class="agy-row">
               <span class="agy-row-label">Khung giờ</span>
               <select id="agy-time-override-select" class="agy-select">
@@ -2472,6 +2569,7 @@
     const weatherCityInput = container.querySelector('#agy-weather-city-input');
     const weatherCityApply = container.querySelector('#agy-weather-city-apply');
     const weatherCityAuto = container.querySelector('#agy-weather-city-auto');
+    const seasonOverrideSelect = container.querySelector('#agy-season-override-select');
     const timeOverrideSelect = container.querySelector('#agy-time-override-select');
     const weatherOverrideSelect = container.querySelector('#agy-weather-override-select');
     const weatherSoundToggle = container.querySelector('#agy-weather-sound-toggle');
@@ -2533,6 +2631,13 @@
             window.agyRequestWeatherRefresh(JSON.stringify({ force: true, city: '' }));
           } catch (_) {}
         }
+      });
+    }
+
+    if (seasonOverrideSelect) {
+      seasonOverrideSelect.addEventListener('change', (e) => {
+        applyTheme({ seasonOverride: e.target.value }, true);
+        rerenderKeepScroll();
       });
     }
 
@@ -2706,7 +2811,7 @@
             throw new Error('JSON không hợp lệ');
           }
           const allowed = {};
-          const keys = ['themeName', 'bubbleName', 'inputStyle', 'dimming', 'wpEnabled', 'customWp', 'userAvatar', 'agentAvatar', 'glassBlur', 'avatarSize', 'avatarRadius', 'leavesEnabled', 'dynamicStart', 'dynamicEnd', 'particleType', 'themeParticles', 'particleCount', 'particleSpeed', 'weatherCity', 'weatherOverride', 'timeOverride', 'soundEnabled', 'soundVolume'];
+          const keys = ['themeName', 'bubbleName', 'inputStyle', 'dimming', 'wpEnabled', 'customWp', 'userAvatar', 'agentAvatar', 'glassBlur', 'avatarSize', 'avatarRadius', 'leavesEnabled', 'dynamicStart', 'dynamicEnd', 'particleType', 'themeParticles', 'particleCount', 'particleSpeed', 'weatherCity', 'weatherOverride', 'timeOverride', 'seasonOverride', 'soundEnabled', 'soundVolume'];
           keys.forEach((k) => {
             if (parsed[k] !== undefined) allowed[k] = parsed[k];
           });
@@ -2742,6 +2847,7 @@
         localStorage.removeItem(STORAGE_WEATHER_CITY);
         localStorage.removeItem(STORAGE_WEATHER_OVERRIDE);
         localStorage.removeItem(STORAGE_TIME_OVERRIDE);
+        localStorage.removeItem(STORAGE_SEASON_OVERRIDE);
         localStorage.removeItem(STORAGE_SOUND_ENABLED);
         localStorage.removeItem(STORAGE_SOUND_VOLUME);
         applyTheme({
@@ -2766,6 +2872,7 @@
           weatherCity: '',
           weatherOverride: 'auto',
           timeOverride: 'auto',
+          seasonOverride: 'auto',
           soundEnabled: true,
           soundVolume: 42
         }, true);
@@ -3077,12 +3184,13 @@
     const mainTheme = resolveTheme(st.themeName, st);
     const audioEng = window.__AGY_WEATHER_AUDIO__;
     const audioSuspended = Boolean(st.soundEnabled && audioEng && audioEng.ctx && audioEng.ctx.state === 'suspended');
-    const sig = `${w.city}|${w.temperature}|${w.condition}|${w.label}|${w.period}|${Math.round(w.windSpeed)}|${Math.round(w.cloudCover)}|${w.isSimulated}|${mainTheme.primary}|${st.soundEnabled}|${st.soundVolume}|${audioSuspended}`;
+    const isSeasonal = Boolean(rootDef.isSeasonalDynamic);
+    const sig = `${w.city}|${w.temperature}|${w.condition}|${w.label}|${w.period}|${isSeasonal ? w.season : ''}|${Math.round(w.windSpeed)}|${Math.round(w.cloudCover)}|${w.isSimulated}|${mainTheme.primary}|${st.soundEnabled}|${st.soundVolume}|${audioSuspended}`;
 
     if (existing && existing.isConnected) {
       if (existing.dataset.sig !== sig) {
         existing.dataset.sig = sig;
-        existing.innerHTML = buildWeatherHudHtml(w, mainTheme, st, audioSuspended);
+        existing.innerHTML = buildWeatherHudHtml(w, mainTheme, st, audioSuspended, isSeasonal);
       }
       return;
     }
@@ -3119,7 +3227,7 @@
       gap: 3px;
       transition: background-color 0.14s ease, border-color 0.14s ease;
     `;
-    pill.innerHTML = buildWeatherHudHtml(w, mainTheme, st, audioSuspended);
+    pill.innerHTML = buildWeatherHudHtml(w, mainTheme, st, audioSuspended, isSeasonal);
     pill.addEventListener('click', (e) => {
       const soundBtn = e.target.closest?.('#agy-hud-sound-btn');
       if (soundBtn) {
@@ -3145,11 +3253,12 @@
     anchor.parentNode.insertBefore(pill, anchor);
   }
 
-  function buildWeatherHudHtml(w, mainTheme, st, audioSuspended) {
+  function buildWeatherHudHtml(w, mainTheme, st, audioSuspended, isSeasonal) {
     const tempStr = w.temperature !== null ? `${w.temperature}°C` : '';
     const soundIcon = !st.soundEnabled ? UI_ICONS.soundOff : UI_ICONS.soundOn;
     const soundColor = !st.soundEnabled ? '#71717a' : (audioSuspended ? '#a1a1aa' : '#ffffff');
     const soundTitle = !st.soundEnabled ? 'Bật âm thanh' : (audioSuspended ? 'Kích hoạt âm thanh' : 'Tắt âm thanh');
+    const timeTag = isSeasonal ? `${w.seasonLabel} · ${w.periodLabel}` : w.periodLabel;
     return `
       <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px;">
         <div style="display: flex; align-items: center; gap: 6px; min-width: 0; color: #e4e4e7;">
@@ -3157,7 +3266,7 @@
           <span style="font-size: 12.5px; font-weight: 450; color: #ffffff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums;">${tempStr ? tempStr + ' · ' : ''}${w.label}</span>
         </div>
         <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
-          <span style="font-size: 11px; font-weight: 400; color: #87888f; white-space: nowrap;">${w.periodLabel}</span>
+          <span style="font-size: 11px; font-weight: 400; color: #87888f; white-space: nowrap;">${timeTag}</span>
           <button id="agy-hud-sound-btn" type="button" title="${soundTitle}" style="background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.09); border-radius: 9999px; width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; color: ${soundColor}; padding: 0;">${soundIcon}</button>
         </div>
       </div>
@@ -3175,7 +3284,7 @@
     if (th.isWeatherDynamic) {
       const eff = getEffectiveWeather(st);
       const sub = getDynamicSubThemeName(st.themeName, st);
-      const sig = `${sub}|${eff.condition}|${eff.period}`;
+      const sig = `${sub}|${eff.season}|${eff.condition}|${eff.period}`;
       if (window.__AGY_CURRENT_WEATHER_SIG__ && window.__AGY_CURRENT_WEATHER_SIG__ !== sig) {
         window.__AGY_CURRENT_WEATHER_SIG__ = sig;
         window.__AGY_CURRENT_DYNAMIC_SUBTHEME__ = sub;
@@ -3820,8 +3929,10 @@
     const useWeatherEngine = (particleMode === 'weather' || particleMode === 'rain' || particleMode === 'snow');
 
     const effWeather = getEffectiveWeather(st);
+    const activeRootTheme = THEMES[st.themeName] || {};
+    const activeSeason = (particleMode === 'weather' && activeRootTheme.isSeasonalDynamic) ? effWeather.season : '';
     const modeSig = particleMode === 'weather'
-      ? `weather|${effWeather.condition}|${effWeather.period}|${Math.round(effWeather.windSpeed)}|${Math.round(effWeather.cloudCover)}`
+      ? `weather|${activeSeason}|${effWeather.condition}|${effWeather.period}|${Math.round(effWeather.windSpeed)}|${Math.round(effWeather.cloudCover)}`
       : particleMode;
 
     window.__AGY_PARTICLE_SPEED__ = typeof st.particleSpeed === 'number' ? st.particleSpeed : 1.0;
@@ -4183,16 +4294,19 @@
     const isRainLike = (cond === 'drizzle' || cond === 'rain' || cond === 'heavy_rain' || cond === 'storm');
     const isStorm = cond === 'storm';
     const isSnow = cond === 'snow';
+    const isWinterSeason = activeSeason === 'winter';
+    const effectiveSnow = isSnow || isWinterSeason;
     const isWindy = cond === 'windy';
     const isFog = cond === 'fog';
-    const hasClouds = !isStandaloneWeather && (cond === 'partly_cloudy' || cond === 'mostly_cloudy' || cond === 'overcast' || isRainLike || isSnow || isWindy);
+    const hasClouds = !isStandaloneWeather && (cond === 'partly_cloudy' || cond === 'mostly_cloudy' || cond === 'overcast' || isRainLike || effectiveSnow || isWindy);
     const hasSunbeams = !isStandaloneWeather && isDay && (cond === 'clear' || cond === 'partly_cloudy');
     const hasNightSky = !isStandaloneWeather && !isDay && (cond === 'clear' || cond === 'partly_cloudy');
+    const hasSummerFireflies = !isStandaloneWeather && activeSeason === 'summer' && !isDay && (cond === 'clear' || cond === 'partly_cloudy');
 
     // Time-of-day harmonized atmospheric palettes
     const cloudRgb = isStorm ? '48, 58, 78'
       : isRainLike ? (isDay ? '106, 122, 146' : '44, 58, 82')
-      : cond === 'overcast' ? (isDay ? '148, 158, 174' : '64, 76, 98')
+      : cond === 'overcast' ? (isWinterSeason ? (isDay ? '132, 152, 180' : '54, 70, 96') : (isDay ? '148, 158, 174' : '64, 76, 98'))
       : period === 'morning' ? '255, 224, 198'
       : period === 'noon' ? '248, 252, 255'
       : period === 'afternoon' ? '255, 192, 140'
@@ -4206,17 +4320,22 @@
       : '188, 218, 248';
 
     const orbRgb = !isDay ? '251, 191, 36'
+      : activeSeason === 'spring' ? '255, 224, 238'
+      : activeSeason === 'winter' ? '224, 246, 255'
       : period === 'noon' ? '255, 250, 224'
       : period === 'afternoon' ? '253, 186, 116'
       : '254, 230, 168';
 
     const cloudSprite = hasClouds ? createSoftPuffSprite(160, cloudRgb) : null;
-    const mistSprite = (isFog || cond === 'overcast' || isRainLike) ? createSoftPuffSprite(180, isDay ? '208, 220, 234' : '116, 134, 162') : null;
-    const glowSprite = createGlowOrbSprite(48, isSnow ? '224, 242, 254' : orbRgb);
+    const mistSprite = (isFog || cond === 'overcast' || isRainLike || (isWinterSeason && cond === 'mostly_cloudy')) ? createSoftPuffSprite(180, isDay ? '208, 220, 234' : '116, 134, 162') : null;
+    const glowSprite = createGlowOrbSprite(48, orbRgb);
+    const snowGlowSprite = effectiveSnow ? createGlowOrbSprite(48, '224, 242, 254') : null;
+    const fireflyGoldSpriteW = hasSummerFireflies ? createGlowOrbSprite(44, '253, 224, 71') : null;
+    const fireflyCyanSpriteW = hasSummerFireflies ? createGlowOrbSprite(44, '56, 189, 248') : null;
 
     // 1) Pre-seeded drifting clouds / mist banks
     const clouds = [];
-    const cloudCount = !hasClouds ? 0 : (isStorm ? 14 : cond === 'overcast' ? 16 : cond === 'mostly_cloudy' ? 12 : isRainLike ? 12 : cond === 'partly_cloudy' ? 6 : isWindy ? 7 : isSnow ? 9 : 0);
+    const cloudCount = !hasClouds ? 0 : (isStorm ? 14 : cond === 'overcast' ? 16 : cond === 'mostly_cloudy' ? 12 : isRainLike ? 12 : cond === 'partly_cloudy' ? 6 : isWindy ? 7 : isSnow ? 9 : (isWinterSeason ? 5 : 0));
     for (let i = 0; i < cloudCount; i++) {
       const z = 0.4 + Math.random() * 0.6;
       clouds.push({
@@ -4230,7 +4349,7 @@
     }
 
     const mistBands = [];
-    const mistCount = isStandaloneWeather ? (isRainLike ? 2 : 0) : (isFog ? 16 : (cond === 'overcast' ? 5 : isRainLike ? 5 : 0));
+    const mistCount = isStandaloneWeather ? (isRainLike ? 2 : 0) : (isFog ? 16 : (cond === 'overcast' ? (isWinterSeason ? 9 : 5) : (isWinterSeason && cond === 'mostly_cloudy' ? 5 : (isRainLike ? 5 : 0))));
     for (let i = 0; i < mistCount; i++) {
       mistBands.push({
         x: Math.random() * (width + 500) - 250,
@@ -4239,11 +4358,11 @@
         h: 110 + Math.random() * 140,
         vx: windSign * (0.12 + Math.random() * 0.25 + (isRainLike ? 0.22 : 0)),
         phase: Math.random() * Math.PI * 2,
-        alpha: (isFog ? 0.34 : 0.14) * (0.7 + Math.random() * 0.45)
+        alpha: (isFog ? 0.34 : (isWinterSeason && cond === 'overcast' ? 0.20 : 0.14)) * (0.7 + Math.random() * 0.45)
       });
     }
 
-    // 2) Rain / Snow / Wind Leaves / Atmospheric Motes
+    // 2) Rain / Snow / Seasonal Petals & Leaves / Atmospheric Motes / Fireflies
     const drops = [];
     const splashes = [];
     const ripples = [];
@@ -4264,7 +4383,7 @@
 
     const baseRainCount = cond === 'drizzle' ? 68 : cond === 'rain' ? 135 : cond === 'heavy_rain' ? 210 : isStorm ? 265 : 0;
 
-    // Snowflakes
+    // Snowflakes (live snow OR winter season snowfall)
     const flakes = [];
     function resetFlake(f, fromTop = true) {
       const z = 0.30 + Math.random() * 0.70;
@@ -4278,13 +4397,16 @@
       f.swingAmp = (0.35 + Math.random() * 0.9) * z;
       f.rot = Math.random() * Math.PI * 2;
       f.vRot = (Math.random() - 0.5) * 0.018;
-      f.crystal = z > 0.72 && Math.random() < 0.55;
+      f.crystal = z > 0.68 && Math.random() < (isWinterSeason ? 0.62 : 0.55);
       f.alpha = 0.35 + z * 0.58;
       return f;
     }
-    const baseSnowCount = isSnow ? 98 : 0;
+    const baseSnowCount = isSnow ? 98
+      : isWinterSeason
+        ? (isStorm || isWindy ? 84 : (cond === 'overcast' || cond === 'mostly_cloudy' || isFog ? 64 : (isRainLike ? 36 : 42)))
+        : 0;
 
-    // Wind Ribbons & Tumbling Leaves (windy / storm debris / breezy overcast)
+    // Wind Ribbons & Tumbling Seasonal Petals / Leaves
     const windRibbons = [];
     const ribbonCount = isWindy ? 9 : isStorm ? 5 : 0;
     function resetRibbon(r, randomX = false) {
@@ -4310,37 +4432,94 @@
       { fill: '#65a30d', vein: '#365314' },
       { fill: '#eab308', vein: '#854d0e' }
     ];
+    const SPRING_SAKURA_PAL = [
+      { fill: '#fbcfe8', vein: '#f472b6' },
+      { fill: '#f472b6', vein: '#db2777' },
+      { fill: '#fff1f2', vein: '#fbcfe8' },
+      { fill: '#fda4af', vein: '#f43f5e' },
+      { fill: '#fce7f3', vein: '#ec4899' }
+    ];
+    const SUMMER_GREEN_PAL = [
+      { fill: '#4ade80', vein: '#15803d' },
+      { fill: '#22c55e', vein: '#166534' },
+      { fill: '#84cc16', vein: '#3f6212' },
+      { fill: '#34d399', vein: '#065f46' },
+      { fill: '#a3e635', vein: '#4d7c0f' }
+    ];
+    const AUTUMN_MAPLE_PAL = [
+      { fill: '#dc2626', vein: '#7f1d1d' },
+      { fill: '#ea580c', vein: '#7c2d12' },
+      { fill: '#f59e0b', vein: '#92400e' },
+      { fill: '#eab308', vein: '#854d0e' },
+      { fill: '#f97316', vein: '#9a3412' },
+      { fill: '#ef4444', vein: '#991b1b' }
+    ];
+    const activeLeafPal = activeSeason === 'spring' ? SPRING_SAKURA_PAL
+      : activeSeason === 'summer' ? SUMMER_GREEN_PAL
+      : activeSeason === 'autumn' ? AUTUMN_MAPLE_PAL
+      : MEDIEVAL_LEAVES;
+    const drawAsSakura = activeSeason === 'spring';
+
     const windLeaves = [];
-    const baseLeafCount = isWindy ? 26 : isStorm ? 10 : ((cond === 'overcast' || cond === 'mostly_cloudy') && windKmH >= 12 ? 8 : 0);
+    const baseLeafCount = isWinterSeason ? 0
+      : activeSeason === 'spring' ? (isWindy ? 34 : isRainLike ? 11 : 24)
+      : activeSeason === 'autumn' ? (isWindy ? 34 : isRainLike ? 12 : 24)
+      : activeSeason === 'summer' ? (isWindy ? 26 : isStorm ? 12 : (isDay ? 10 : 4))
+      : (isWindy ? 26 : isStorm ? 10 : ((cond === 'overcast' || cond === 'mostly_cloudy') && windKmH >= 12 ? 8 : 0));
+
     function resetWindLeaf(l, fromEdge = true) {
-      const pal = MEDIEVAL_LEAVES[Math.floor(Math.random() * MEDIEVAL_LEAVES.length)];
+      const pal = activeLeafPal[Math.floor(Math.random() * activeLeafPal.length)];
       const z = 0.45 + Math.random() * 0.55;
       l.z = z;
+      const gentleDrift = !isWindy && !isStorm && !isRainLike && (activeSeason === 'spring' || activeSeason === 'autumn' || activeSeason === 'summer');
       if (fromEdge) {
-        if (Math.random() < 0.65) {
+        if (!gentleDrift && Math.random() < 0.65) {
           l.x = windSign > 0 ? -24 : width + 24;
           l.y = Math.random() * height * 0.85;
         } else {
           l.x = Math.random() * width;
-          l.y = -20;
+          l.y = -(12 + Math.random() * 28);
         }
       } else {
         l.x = Math.random() * width;
         l.y = Math.random() * height;
       }
-      l.size = (5.5 + Math.random() * 5.5) * z;
-      l.vy = (0.35 + Math.random() * 0.85) * z;
-      l.vxBase = windSign * (1.2 + (windKmH / 14) * (0.7 + Math.random() * 0.8)) * z;
+      l.size = (drawAsSakura ? (6.2 + Math.random() * 4.8) : (5.8 + Math.random() * 5.6)) * z;
+      l.vy = gentleDrift ? ((0.30 + Math.random() * 0.44) * z) : ((0.35 + Math.random() * 0.85) * z);
+      l.vxBase = gentleDrift
+        ? (windSign * (0.22 + (windKmH / 28) * (0.4 + Math.random() * 0.5)) * z)
+        : (windSign * (1.2 + (windKmH / 14) * (0.7 + Math.random() * 0.8)) * z);
       l.angle = Math.random() * Math.PI * 2;
-      l.vAngle = (Math.random() - 0.5) * (isWindy || isStorm ? 0.14 : 0.045);
+      l.vAngle = (Math.random() - 0.5) * (isWindy || isStorm ? 0.14 : (gentleDrift ? 0.024 : 0.045));
       l.flip = Math.random() * Math.PI * 2;
-      l.vFlip = 0.04 + Math.random() * 0.07;
+      l.vFlip = gentleDrift ? (0.018 + Math.random() * 0.028) : (0.04 + Math.random() * 0.07);
       l.flutter = Math.random() * Math.PI * 2;
-      l.flutterSpd = 0.04 + Math.random() * 0.05;
+      l.flutterSpd = gentleDrift ? (0.015 + Math.random() * 0.020) : (0.04 + Math.random() * 0.05);
+      l.gentle = gentleDrift;
       l.color = pal.fill;
       l.vein = pal.vein;
-      l.alpha = (isStorm ? 0.55 : 0.72) * z;
+      l.alpha = (isStorm ? 0.55 : (drawAsSakura ? 0.82 : 0.74)) * z;
       return l;
+    }
+
+    // Summer Night Fireflies
+    const summerFireflies = [];
+    const baseFireflyCount = hasSummerFireflies ? 22 : 0;
+    function resetSummerFirefly(ff) {
+      ff.x = Math.random() * width;
+      ff.y = height * (0.34 + Math.random() * 0.62);
+      ff.size = 2.6 + Math.random() * 3.8;
+      ff.vx = (Math.random() - 0.5) * 0.36;
+      ff.vy = -(0.06 + Math.random() * 0.20) + (Math.random() - 0.5) * 0.16;
+      ff.swing = Math.random() * Math.PI * 2;
+      ff.swingSpd = 0.010 + Math.random() * 0.018;
+      ff.swingAmp = 0.28 + Math.random() * 0.52;
+      ff.pulse = Math.random() * Math.PI * 2;
+      ff.vPulse = 0.020 + Math.random() * 0.032;
+      ff.cyan = Math.random() < 0.32;
+      ff.sparkle = Math.random() < 0.38;
+      ff.opacity = 0.65 + Math.random() * 0.33;
+      return ff;
     }
 
     // Sun motes / Night embers / Fog dew motes
@@ -4760,8 +4939,8 @@
         }
       }
 
-      // --- H) Multi-Depth Crystalline Snowfall ---
-      if (isSnow) {
+      // --- H) Multi-Depth Crystalline Snowfall (Live Snow or Winter Season) ---
+      if (effectiveSnow && baseSnowCount > 0) {
         const targetFlakes = Math.round(baseSnowCount * densityScale);
         while (flakes.length < targetFlakes) flakes.push(resetFlake({}, flakes.length >= baseSnowCount));
         while (flakes.length > targetFlakes) flakes.pop();
@@ -4779,13 +4958,13 @@
             drawSnowCrystal(f.x, f.y, f.size * 1.35, f.rot, f.alpha);
           } else {
             ctx.globalAlpha = f.alpha;
-            ctx.drawImage(glowSprite, f.x - f.size * 1.6, f.y - f.size * 1.6, f.size * 3.2, f.size * 3.2);
+            ctx.drawImage(snowGlowSprite || glowSprite, f.x - f.size * 1.6, f.y - f.size * 1.6, f.size * 3.2, f.size * 3.2);
           }
         }
         ctx.globalAlpha = 1;
       }
 
-      // --- I) Wind-Swept Tumbling Leaves (Windy / Storm / Breezy Overcast) ---
+      // --- I) Seasonal Petals / Leaves (Spring Sakura, Summer Green, Autumn Maple, Wind Debris) ---
       if (baseLeafCount > 0) {
         const targetLeaves = Math.round(baseLeafCount * densityScale);
         while (windLeaves.length < targetLeaves) windLeaves.push(resetWindLeaf({}, windLeaves.length >= baseLeafCount));
@@ -4794,12 +4973,11 @@
         for (let i = 0; i < windLeaves.length; i++) {
           const l = windLeaves[i];
           l.flutter += l.flutterSpd * spd;
-          l.angle += (l.vAngle + windNow * 0.012) * spd;
+          l.angle += (l.vAngle + windNow * (l.gentle ? 0.004 : 0.012)) * spd;
           l.flip += l.vFlip * spd;
-          // Aerodynamic upward lift eddies during strong wind surges
-          const eddyLift = (isWindy || isStorm) ? Math.sin(l.flutter) * (0.95 + Math.abs(gustWave) * 1.2) : Math.sin(l.flutter) * 0.35;
+          const eddyLift = (isWindy || isStorm) ? Math.sin(l.flutter) * (0.95 + Math.abs(gustWave) * 1.2) : Math.sin(l.flutter) * (l.gentle ? 0.14 : 0.35);
           l.y += (l.vy + eddyLift) * spd;
-          l.x += (l.vxBase + windNow * 0.42) * spd;
+          l.x += (l.vxBase + windNow * (l.gentle ? 0.18 : 0.42) + (l.gentle ? Math.sin(l.flutter) * 0.55 : 0)) * spd;
 
           if (l.y > height + 30 || l.y < -60 || l.x > width + 45 || l.x < -45) {
             resetWindLeaf(l, true);
@@ -4812,18 +4990,66 @@
           ctx.globalAlpha = l.alpha;
           ctx.fillStyle = l.color;
           ctx.beginPath();
-          ctx.moveTo(0, -l.size);
-          ctx.bezierCurveTo(l.size * 0.68, -l.size * 0.30, l.size * 0.68, l.size * 0.60, 0, l.size);
-          ctx.bezierCurveTo(-l.size * 0.68, l.size * 0.60, -l.size * 0.68, -l.size * 0.30, 0, -l.size);
-          ctx.fill();
-          ctx.strokeStyle = l.vein;
-          ctx.lineWidth = 0.55;
-          ctx.beginPath();
-          ctx.moveTo(0, -l.size * 0.8);
-          ctx.lineTo(0, l.size * 0.8);
-          ctx.stroke();
+          if (drawAsSakura) {
+            ctx.moveTo(0, l.size);
+            ctx.bezierCurveTo(l.size * 0.75, l.size * 0.4, l.size * 0.85, -l.size * 0.5, l.size * 0.25, -l.size);
+            ctx.quadraticCurveTo(0, -l.size * 0.75, -l.size * 0.25, -l.size);
+            ctx.bezierCurveTo(-l.size * 0.85, -l.size * 0.5, -l.size * 0.75, l.size * 0.4, 0, l.size);
+            ctx.fill();
+            ctx.strokeStyle = l.vein;
+            ctx.lineWidth = 0.5;
+            ctx.stroke();
+          } else {
+            ctx.moveTo(0, -l.size);
+            ctx.bezierCurveTo(l.size * 0.68, -l.size * 0.30, l.size * 0.68, l.size * 0.60, 0, l.size);
+            ctx.bezierCurveTo(-l.size * 0.68, l.size * 0.60, -l.size * 0.68, -l.size * 0.30, 0, -l.size);
+            ctx.fill();
+            ctx.strokeStyle = l.vein;
+            ctx.lineWidth = 0.55;
+            ctx.beginPath();
+            ctx.moveTo(0, -l.size * 0.8);
+            ctx.lineTo(0, l.size * 0.8);
+            ctx.stroke();
+          }
           ctx.restore();
         }
+      }
+
+      // --- I2) Summer Night Coastal Fireflies ---
+      if (hasSummerFireflies && baseFireflyCount > 0) {
+        const targetFF = Math.round(baseFireflyCount * densityScale);
+        while (summerFireflies.length < targetFF) summerFireflies.push(resetSummerFirefly({}));
+        while (summerFireflies.length > targetFF) summerFireflies.pop();
+
+        for (let i = 0; i < summerFireflies.length; i++) {
+          const ff = summerFireflies[i];
+          ff.swing += ff.swingSpd * spd;
+          ff.pulse += ff.vPulse * spd;
+          ff.x += (ff.vx + Math.sin(ff.swing) * ff.swingAmp + windNow * 0.03) * spd;
+          ff.y += (ff.vy + Math.cos(ff.swing * 0.72) * 0.18) * spd;
+          if (ff.x < -20) ff.x = width + 18;
+          if (ff.x > width + 20) ff.x = -18;
+          if (ff.y < height * 0.22) ff.y = height - 10;
+          if (ff.y > height + 18) ff.y = height * 0.38;
+
+          const glow = 0.24 + 0.76 * (0.5 + 0.5 * Math.sin(ff.pulse));
+          const spr = ff.cyan ? fireflyCyanSpriteW : fireflyGoldSpriteW;
+          const dSize = ff.size * (3.0 + glow * 1.4);
+          ctx.globalAlpha = ff.opacity * glow;
+          ctx.drawImage(spr, ff.x - dSize * 0.5, ff.y - dSize * 0.5, dSize, dSize);
+          if (ff.sparkle && glow > 0.76) {
+            const arm = ff.size * 1.3 * glow;
+            ctx.strokeStyle = ff.cyan ? 'rgba(224, 242, 254, 0.85)' : 'rgba(254, 249, 195, 0.88)';
+            ctx.lineWidth = 0.7;
+            ctx.beginPath();
+            ctx.moveTo(ff.x - arm, ff.y);
+            ctx.lineTo(ff.x + arm, ff.y);
+            ctx.moveTo(ff.x, ff.y - arm);
+            ctx.lineTo(ff.x, ff.y + arm);
+            ctx.stroke();
+          }
+        }
+        ctx.globalAlpha = 1;
       }
 
       // --- J) Luminous Sun Motes / Night Golden Town Embers / Mist Dew ---
