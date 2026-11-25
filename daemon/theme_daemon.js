@@ -509,9 +509,10 @@ function createSession(target) {
             const src = buildInjectedSource();
             if (!src) return;
             try {
+                await send('Page.addScriptToEvaluateOnNewDocument', { source: src });
                 await send('Runtime.evaluate', { expression: src, awaitPromise: false });
             } catch (_) {}
-        }, 150);
+        }, 80);
     };
 
     session.syncConfig = (newCfg) => {
@@ -643,6 +644,15 @@ function connectBrowserWs(info) {
             method: 'Target.setDiscoverTargets',
             params: { discover: true }
         }));
+        browserWs.send(JSON.stringify({
+            id: 101,
+            method: 'Target.setAutoAttach',
+            params: {
+                autoAttach: true,
+                waitForDebuggerOnStart: false,
+                flatten: true
+            }
+        }));
     });
 
     browserWs.addEventListener('message', (event) => {
@@ -653,20 +663,34 @@ function connectBrowserWs(info) {
             return;
         }
 
+        if (msg.method === 'Target.attachedToTarget') {
+            const targetInfo = msg.params && msg.params.targetInfo;
+            if (!targetInfo || targetInfo.type !== 'page') return;
+            const url = String(targetInfo.url || '');
+            if (url.startsWith('devtools://') || url.startsWith('chrome-extension://') || url.startsWith('data:')) return;
+            if (!sessions.has(targetInfo.targetId)) {
+                createSession({
+                    id: targetInfo.targetId,
+                    url: targetInfo.url,
+                    title: targetInfo.title,
+                    webSocketDebuggerUrl: `ws://127.0.0.1:${info.port}/devtools/page/${targetInfo.targetId}`
+                });
+            }
+            return;
+        }
+
         if (msg.method === 'Target.targetCreated' || msg.method === 'Target.targetInfoChanged') {
             const targetInfo = msg.params && msg.params.targetInfo;
             if (!targetInfo || targetInfo.type !== 'page') return;
             const url = String(targetInfo.url || '');
-            if (url.startsWith('devtools://') || url.startsWith('chrome-extension://')) return;
-            if (url.includes('127.0.0.1') || url.includes('workbench') || url.includes('launchpad')) {
-                if (!sessions.has(targetInfo.targetId)) {
-                    createSession({
-                        id: targetInfo.targetId,
-                        url: targetInfo.url,
-                        title: targetInfo.title,
-                        webSocketDebuggerUrl: `ws://127.0.0.1:${info.port}/devtools/page/${targetInfo.targetId}`
-                    });
-                }
+            if (url.startsWith('devtools://') || url.startsWith('chrome-extension://') || url.startsWith('data:')) return;
+            if (!sessions.has(targetInfo.targetId)) {
+                createSession({
+                    id: targetInfo.targetId,
+                    url: targetInfo.url,
+                    title: targetInfo.title,
+                    webSocketDebuggerUrl: `ws://127.0.0.1:${info.port}/devtools/page/${targetInfo.targetId}`
+                });
             }
         } else if (msg.method === 'Target.targetDestroyed') {
             const id = msg.params && msg.params.targetId;
@@ -762,7 +786,8 @@ async function scanPages() {
         if (!t || t.type !== 'page' || !t.webSocketDebuggerUrl) return false;
         const url = String(t.url || '');
         if (url.startsWith('devtools://') || url.startsWith('chrome-extension://')) return false;
-        return url.includes('127.0.0.1') || url.includes('workbench') || url.includes('launchpad');
+        if (url.startsWith('data:')) return false;
+        return true;
     });
 
     const liveIds = new Set(pages.map((p) => p.id));
@@ -852,4 +877,4 @@ watchPayload();
 refreshWeather({ force: true });
 setInterval(() => refreshWeather(), WEATHER_POLL_MS);
 scanPages();
-setInterval(scanPages, 8000);
+setInterval(scanPages, 2000);
