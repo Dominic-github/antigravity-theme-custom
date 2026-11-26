@@ -24,10 +24,10 @@
   };
 
   const SEASONS = {
-    spring: { label: 'Xuân', range: 'Tháng 3 – 5' },
-    summer: { label: 'Hạ',   range: 'Tháng 6 – 8' },
-    autumn: { label: 'Thu',  range: 'Tháng 9 – 11' },
-    winter: { label: 'Đông', range: 'Tháng 12 – 2' }
+    spring: { label: 'Xuân', range: 'Tháng 2 – 4' },
+    summer: { label: 'Hạ',   range: 'Tháng 5 – 7' },
+    autumn: { label: 'Thu',  range: 'Tháng 8 – 10' },
+    winter: { label: 'Đông', range: 'Tháng 11 – 1' }
   };
 
   function getSeason(dateObj, overrideVal, liveWeather) {
@@ -37,9 +37,9 @@
     const m = (dateObj || new Date()).getMonth() + 1;
     const lat = liveWeather && Number.isFinite(liveWeather.lat) ? liveWeather.lat : 21;
     let s;
-    if (m >= 3 && m <= 5) s = 'spring';
-    else if (m >= 6 && m <= 8) s = 'summer';
-    else if (m >= 9 && m <= 11) s = 'autumn';
+    if (m >= 2 && m <= 4) s = 'spring';
+    else if (m >= 5 && m <= 7) s = 'summer';
+    else if (m >= 8 && m <= 10) s = 'autumn';
     else s = 'winter';
     if (lat < 0) {
       const flip = { spring: 'autumn', summer: 'winter', autumn: 'spring', winter: 'summer' };
