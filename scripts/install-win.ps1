@@ -105,7 +105,19 @@ if (-not $NoStartup) {
     Write-Host "[install-win] Startup shortcut created: $ShortcutPath"
     try {
         Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name "AntigravityCustomTheme" -Value "wscript.exe `"$VbsPath`"" -ErrorAction SilentlyContinue
-        Write-Host "[install-win] Registered in HKCU Run registry key."
+        $ApprovedPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run"
+        if (Test-Path $ApprovedPath) {
+            Set-ItemProperty -Path $ApprovedPath -Name "AntigravityCustomTheme" -Type Binary -Value ([byte[]](2,0,0,0,0,0,0,0,0,0,0,0)) -ErrorAction SilentlyContinue
+        }
+        $ApprovedFolderPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\StartupFolder"
+        if (Test-Path $ApprovedFolderPath) {
+            Set-ItemProperty -Path $ApprovedFolderPath -Name "AntigravityCustomTheme.lnk" -Type Binary -Value ([byte[]](2,0,0,0,0,0,0,0,0,0,0,0)) -ErrorAction SilentlyContinue
+        }
+        $ApprovedFolderPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\StartupFolder"
+        if (Test-Path $ApprovedFolderPath) {
+            Set-ItemProperty -Path $ApprovedFolderPath -Name "AntigravityCustomTheme.lnk" -Type Binary -Value ([byte[]](2,0,0,0,0,0,0,0,0,0,0,0)) -ErrorAction SilentlyContinue
+        }
+        Write-Host "[install-win] Registered and enabled in HKCU Run registry key."
     } catch {}
 }
 
